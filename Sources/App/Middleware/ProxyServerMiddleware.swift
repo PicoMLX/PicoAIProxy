@@ -81,8 +81,9 @@ extension HBRequest {
         // Update headers with org and API key environment variables
         var headers = self.headers
         headers.remove(name: "host")
-        let org = HBEnvironment().get("organization") ?? "org-0"
-        let apiKey = HBEnvironment().get("apiKey") ?? "sk-0"
+        guard let org = HBEnvironment().get("organization"), let apiKey = HBEnvironment().get("apiKey"), !org.isEmpty, !apiKey.isEmpty else {
+            fatalError("apiKey and organization environment variables need to be set")
+        }
         headers.replaceOrAdd(name: "OpenAI-Organization", value: org)
         headers.replaceOrAdd(name: "Authorization", value: "Bearer \(apiKey)")
         

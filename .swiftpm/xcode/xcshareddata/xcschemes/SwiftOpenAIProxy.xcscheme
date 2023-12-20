@@ -75,25 +75,21 @@
             ReferencedContainer = "container:">
          </BuildableReference>
       </BuildableProductRunnable>
+      <CommandLineArguments>
+         <CommandLineArgument
+            argument = "--port 8081"
+            isEnabled = "YES">
+         </CommandLineArgument>
+      </CommandLineArguments>
       <EnvironmentVariables>
          <EnvironmentVariable
-            key = "port"
-            value = "8081"
-            isEnabled = "YES">
-         </EnvironmentVariable>
-         <EnvironmentVariable
             key = "apiKey"
-            value = "sk-123"
-            isEnabled = "YES">
-         </EnvironmentVariable>
-         <EnvironmentVariable
-            key = "target"
-            value = "https://api.openai.com"
+            value = ""
             isEnabled = "YES">
          </EnvironmentVariable>
          <EnvironmentVariable
             key = "organization"
-            value = "sk-0"
+            value = ""
             isEnabled = "YES">
          </EnvironmentVariable>
       </EnvironmentVariables>

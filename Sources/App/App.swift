@@ -15,19 +15,13 @@ struct HummingbirdArguments: ParsableCommand, AppArguments {
     var hostname: String = "0.0.0.0"
 
     @Option(name: .shortAndLong)
-    var port: Int = Int(HBEnvironment().get("port") ?? "443") ?? 443
-
-    @Option(name: .shortAndLong)
-    var organization: String = HBEnvironment().get("organization") ?? "org-0"
-    
-    @Option(name: .shortAndLong)
-    var apiKey: String = HBEnvironment().get("apiKey") ?? "sk-0"
+    var port: Int = 443
 
     @Option(name: .shortAndLong)
     var location: String = ""
 
     @Option(name: .shortAndLong)
-    var target: String = HBEnvironment().get("target") ?? "https://api.openai.com"
+    var target: String = "https://api.openai.com"
 
     func run() throws {
         let app = HBApplication(
