@@ -78,6 +78,7 @@ extension HBRequest {
     /// create AsyncHTTPClient request from Hummingbird Request
     func ahcRequest(uri: String, host: String, eventLoop: EventLoop) throws -> HTTPClient.Request {
         
+        // Update headers with org and API key environment variables
         var headers = self.headers
         headers.remove(name: "host")
         let org = HBEnvironment().get("organization") ?? "org-0"
