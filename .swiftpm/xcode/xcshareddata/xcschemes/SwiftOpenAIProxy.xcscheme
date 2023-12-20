@@ -75,21 +75,15 @@
             ReferencedContainer = "container:">
          </BuildableReference>
       </BuildableProductRunnable>
-      <CommandLineArguments>
-         <CommandLineArgument
-            argument = "--target http://httpbin.org"
-            isEnabled = "NO">
-         </CommandLineArgument>
-      </CommandLineArguments>
       <EnvironmentVariables>
-         <EnvironmentVariable
-            key = "key"
-            value = "sk-123"
-            isEnabled = "YES">
-         </EnvironmentVariable>
          <EnvironmentVariable
             key = "port"
             value = "8081"
+            isEnabled = "YES">
+         </EnvironmentVariable>
+         <EnvironmentVariable
+            key = "apiKey"
+            value = "sk-123"
             isEnabled = "YES">
          </EnvironmentVariable>
          <EnvironmentVariable

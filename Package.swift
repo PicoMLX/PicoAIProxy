@@ -4,7 +4,7 @@
 import PackageDescription
 
 let package = Package(
-    name: "hummingbird-template",
+    name: "SwiftOpenAIProxy",
     products: [
         .executable(name: "App", targets: ["App"]),
     ],

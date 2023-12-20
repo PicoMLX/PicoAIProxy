@@ -12,22 +12,25 @@ import Hummingbird
 @main
 struct HummingbirdArguments: ParsableCommand, AppArguments {
     @Option(name: .shortAndLong)
-    var hostname: String = "127.0.0.1"
+    var hostname: String = "0.0.0.0"
 
     @Option(name: .shortAndLong)
-    var port: Int = 8081
+    var port: Int = Int(HBEnvironment().get("port") ?? "443") ?? 443
+    
+    @Option(name: .shortAndLong)
+    var apiKey: String = HBEnvironment().get("apiKey") ?? "sk-0"
 
     @Option(name: .shortAndLong)
     var location: String = ""
 
     @Option(name: .shortAndLong)
-    var target: String = "https://api.openai.com"
+    var target: String = HBEnvironment().get("target") ?? "https://api.openai.com"
 
     func run() throws {
         let app = HBApplication(
             configuration: .init(
                 address: .hostname(self.hostname, port: self.port),
-                serverName: "ProxyServer"
+                serverName: "SwiftOpenAIProxyServer"
             )
         )
         try app.configure(self)
