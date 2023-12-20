@@ -5,6 +5,7 @@ import PackageDescription
 
 let package = Package(
     name: "SwiftOpenAIProxy",
+    platforms: [.macOS(.v10_15), .iOS(.v12), .tvOS(.v12)],
     products: [
         .executable(name: "App", targets: ["App"]),
     ],

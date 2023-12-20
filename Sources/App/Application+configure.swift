@@ -11,7 +11,7 @@ extension HBApplication {
     /// add middleware
     /// setup the encoder/decoder
     /// add your routes
-    func configure(_ args: AppArguments) throws {
+    func configure(_ args: AppArguments) async throws {
         self.httpClient = HTTPClient(eventLoopGroupProvider: .shared(self.eventLoopGroup))
         self.middleware.add(
             HBProxyServerMiddleware(

@@ -4,17 +4,17 @@ import HummingbirdXCT
 import XCTest
 
 final class AppTests: XCTestCase {
-    func createProxy(port: Int) throws -> HBApplication {
+    func createProxy(port: Int) async throws -> HBApplication {
         struct Arguments: AppArguments {
             var location: String
             var target: String
         }
-        return try createProxy(args: Arguments(location: "", target: "http://localhost:\(port)"))
+        return try await createProxy(args: Arguments(location: "", target: "http://localhost:\(port)"))
     }
 
-    func createProxy(args: AppArguments) throws -> HBApplication {
+    func createProxy(args: AppArguments) async throws -> HBApplication {
         let app = HBApplication(testing: .live)
-        try app.configure(args)
+        try await app.configure(args)
         return app
     }
 
@@ -24,7 +24,7 @@ final class AppTests: XCTestCase {
         return ByteBufferAllocator().buffer(bytes: data)
     }
 
-    func testSimple() throws {
+    func testSimple() async throws {
         let app = HBApplication(configuration: .init(address: .hostname(port: 0)))
         app.router.get("hello") { _ in
             return "Hello"
@@ -32,7 +32,7 @@ final class AppTests: XCTestCase {
         try app.start()
         defer { app.stop() }
 
-        let proxy = try createProxy(port: app.server.port!)
+        let proxy = try await createProxy(port: app.server.port!)
         try proxy.XCTStart()
         defer { proxy.XCTStop() }
 
@@ -42,7 +42,7 @@ final class AppTests: XCTestCase {
         }
     }
 
-    func testEchoBody() throws {
+    func testEchoBody() async throws {
         let app = HBApplication(configuration: .init(address: .hostname(port: 0)))
         app.router.post("echo") { request in
             return request.body.buffer
@@ -50,7 +50,7 @@ final class AppTests: XCTestCase {
         try app.start()
         defer { app.stop() }
 
-        let proxy = try createProxy(port: app.server.port!)
+        let proxy = try await createProxy(port: app.server.port!)
         try proxy.XCTStart()
         defer { proxy.XCTStop() }
 
@@ -61,7 +61,7 @@ final class AppTests: XCTestCase {
         }
     }
 
-    func testLargeBody() throws {
+    func testLargeBody() async throws {
         let app = HBApplication(configuration: .init(address: .hostname(port: 0)))
         app.router.post("echo") { request in
             return request.body.buffer
@@ -69,7 +69,7 @@ final class AppTests: XCTestCase {
         try app.start()
         defer { app.stop() }
 
-        let proxy = try createProxy(port: app.server.port!)
+        let proxy = try await createProxy(port: app.server.port!)
         try proxy.XCTStart()
         defer { proxy.XCTStop() }
 

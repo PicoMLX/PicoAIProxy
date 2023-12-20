@@ -10,7 +10,7 @@ import ArgumentParser
 import Hummingbird
 
 @main
-struct HummingbirdArguments: ParsableCommand, AppArguments {
+struct HummingbirdArguments: AsyncParsableCommand, AppArguments {
     @Option(name: .shortAndLong)
     var hostname: String = "0.0.0.0"
 
@@ -23,15 +23,15 @@ struct HummingbirdArguments: ParsableCommand, AppArguments {
     @Option(name: .shortAndLong)
     var target: String = "https://api.openai.com"
 
-    func run() throws {
+    func run() async throws {
         let app = HBApplication(
             configuration: .init(
                 address: .hostname(self.hostname, port: self.port),
                 serverName: "SwiftOpenAIProxyServer"
             )
         )
-        try app.configure(self)
+        try await app.configure(self)
         try app.start()
-        app.wait()
+        await app.asyncWait()
     }
 }
