@@ -77,8 +77,14 @@ public struct HBProxyServerMiddleware: HBMiddleware {
 extension HBRequest {
     /// create AsyncHTTPClient request from Hummingbird Request
     func ahcRequest(uri: String, host: String, eventLoop: EventLoop) throws -> HTTPClient.Request {
+        
         var headers = self.headers
         headers.remove(name: "host")
+        let org = HBEnvironment().get("organization") ?? "org-0"
+        let apiKey = HBEnvironment().get("apiKey") ?? "sk-0"
+        headers.replaceOrAdd(name: "OpenAI-Organization", value: org)
+        headers.replaceOrAdd(name: "Authorization", value: "Bearer \(apiKey)")
+        
         switch self.body {
         case .byteBuffer(let buffer):
             return try HTTPClient.Request(
