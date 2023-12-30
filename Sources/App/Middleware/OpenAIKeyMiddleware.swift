@@ -16,13 +16,12 @@ struct OpenAIKeyMiddleware: HBMiddleware {
             return request.failure(.internalServerError, message: "apiKey and organization environment variables need to be set")
         }
         
-        var request = request
         var headers = request.headers
         headers.replaceOrAdd(name: "OpenAI-Organization", value: org)
         headers.replaceOrAdd(name: "Authorization", value: "Bearer \(apiKey)")
         
         let head = HTTPRequestHead(version: request.version, method: request.method, uri: request.uri.string, headers: headers)
-        let updatedRequest = HBRequest(head: head, body: request.body, application: request.application, context: request.context)
+        let request = HBRequest(head: head, body: request.body, application: request.application, context: request.context)
         
         return next.respond(to: request)
     }
@@ -37,22 +36,21 @@ struct OpenAIKeyMiddleware: HBAsyncMiddleware {
             throw HBHTTPError(.internalServerError, message: "apiKey and organization environment variables need to be set")
         }
         
-        var request = request
         var headers = request.headers
         headers.replaceOrAdd(name: "OpenAI-Organization", value: org)
         headers.replaceOrAdd(name: "Authorization", value: "Bearer \(apiKey)")
         
         let head = HTTPRequestHead(version: request.version, method: request.method, uri: request.uri.string, headers: headers)
-        let updatedRequest = HBRequest(head: head, body: request.body, application: request.application, context: request.context)
+        let request = HBRequest(head: head, body: request.body, application: request.application, context: request.context)
         
-        var response = try await next.respond(to: updatedRequest)
+        var response = try await next.respond(to: request)
 
 //        response.headers.replaceOrAdd(name: "OpenAI-Organization", value: org)
 //        response.headers.replaceOrAdd(name: "Authorization", value: "Bearer \(apiKey)")
 
         
-//        response.headers.add(name: "My-App-Version", value: "v2.5.9")
-        return response        
+//        response.updatedRequest.add(name: "My-App-Version", value: "v2.5.9")
+        return response
     }
 }
 */
