@@ -5,21 +5,27 @@ import PackageDescription
 
 let package = Package(
     name: "SwiftOpenAIProxy",
-    platforms: [.macOS(.v10_15), .iOS(.v12), .tvOS(.v12)],
+    platforms: [.macOS(.v12)],
     products: [
         .executable(name: "App", targets: ["App"]),
     ],
     dependencies: [
         .package(url: "https://github.com/hummingbird-project/hummingbird.git", from: "1.10.1"),
+        .package(url: "https://github.com/ronaldmannak/hummingbird-auth.git", branch: "main"),
         .package(url: "https://github.com/apple/swift-argument-parser.git", from: "1.3.0"),
         .package(url: "https://github.com/swift-server/async-http-client.git", from: "1.19.0"),
+        .package(url: "https://github.com/apple/app-store-server-library-swift.git", from: "1.0.0"),
+        .package(url: "https://github.com/ronaldmannak/AppAttest.git", branch: "main"),
     ],
     targets: [
         .executableTarget(name: "App",
             dependencies: [
-                .product(name: "ArgumentParser", package: "swift-argument-parser"),
                 .product(name: "Hummingbird", package: "hummingbird"),
+                .product(name: "HummingbirdAuth", package: "hummingbird-auth"),
+                .product(name: "ArgumentParser", package: "swift-argument-parser"), 
                 .product(name: "AsyncHTTPClient", package: "async-http-client"),
+                .product(name: "AppStoreServerLibrary", package: "app-store-server-library-swift"),
+                .product(name: "AppAttest", package: "AppAttest"),
             ],
             swiftSettings: [
                 // Enable better optimizations when building in Release configuration. Despite the use of

@@ -78,14 +78,13 @@ extension HBRequest {
     /// create AsyncHTTPClient request from Hummingbird Request
     func ahcRequest(uri: String, host: String, eventLoop: EventLoop) throws -> HTTPClient.Request {
         
-        // Update headers with org and API key environment variables
         var headers = self.headers
         headers.remove(name: "host")
-        guard let org = HBEnvironment().get("organization"), let apiKey = HBEnvironment().get("apiKey"), !org.isEmpty, !apiKey.isEmpty else {
-            fatalError("apiKey and organization environment variables need to be set")
-        }
-        headers.replaceOrAdd(name: "OpenAI-Organization", value: org)
-        headers.replaceOrAdd(name: "Authorization", value: "Bearer \(apiKey)")
+//        guard let org = HBEnvironment().get("organization"), let apiKey = HBEnvironment().get("apiKey"), !org.isEmpty, !apiKey.isEmpty else {
+//            fatalError("apiKey and organization environment variables need to be set")
+//        }
+//        headers.replaceOrAdd(name: "OpenAI-Organization", value: org)
+//        headers.replaceOrAdd(name: "Authorization", value: "Bearer \(apiKey)")
         
         switch self.body {
         case .byteBuffer(let buffer):
