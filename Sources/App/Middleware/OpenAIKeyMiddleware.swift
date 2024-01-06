@@ -11,7 +11,7 @@ import NIOHTTP1
 struct OpenAIKeyMiddleware: HBMiddleware {
     func apply(to request: Hummingbird.HBRequest, next: Hummingbird.HBResponder) -> NIOCore.EventLoopFuture<Hummingbird.HBResponse> {
         
-        guard let org = HBEnvironment().get("organization"), let apiKey = HBEnvironment().get("apiKey"), !org.isEmpty, !apiKey.isEmpty else {
+        guard let org = HBEnvironment().get("OpenAI-Organization"), let apiKey = HBEnvironment().get("OpenAI-APIKey"), !org.isEmpty, !apiKey.isEmpty else {
             
             return request.failure(.internalServerError, message: "apiKey and organization environment variables need to be set")
         }

@@ -1,5 +1,6 @@
 import AsyncHTTPClient
 import Hummingbird
+import Foundation
 
 public protocol AppArguments {
     var location: String { get }
@@ -13,6 +14,10 @@ extension HBApplication {
     /// add your routes
     func configure(_ args: AppArguments) async throws {
         
+        self.encoder = JSONEncoder()
+        self.decoder = JSONDecoder()
+        (self.encoder as! JSONEncoder).dateEncodingStrategy = .iso8601
+        
         self.httpClient = HTTPClient(eventLoopGroupProvider: .shared(self.eventLoopGroup))
         
         // Add logging middleware
@@ -20,7 +25,9 @@ extension HBApplication {
         self.middleware.add(HBLogRequestsMiddleware(.info))
         
         // Add App attestation middleware
-//        self.middleware.add(AppAttestationMiddleware())
+        let attestationController = AttestationController()
+        attestationController.addRoutes(to: self.router.group("attestation"))
+        self.middleware.add(AttestationMiddleware(attestationController: attestationController))        
         
         // Add non forwarding routing
         self.router.get("hello") { request in

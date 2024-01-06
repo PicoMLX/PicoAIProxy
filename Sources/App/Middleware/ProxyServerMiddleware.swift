@@ -80,12 +80,7 @@ extension HBRequest {
         
         var headers = self.headers
         headers.remove(name: "host")
-//        guard let org = HBEnvironment().get("organization"), let apiKey = HBEnvironment().get("apiKey"), !org.isEmpty, !apiKey.isEmpty else {
-//            fatalError("apiKey and organization environment variables need to be set")
-//        }
-//        headers.replaceOrAdd(name: "OpenAI-Organization", value: org)
-//        headers.replaceOrAdd(name: "Authorization", value: "Bearer \(apiKey)")
-        
+
         switch self.body {
         case .byteBuffer(let buffer):
             return try HTTPClient.Request(
