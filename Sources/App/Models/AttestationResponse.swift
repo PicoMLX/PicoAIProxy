@@ -7,9 +7,10 @@
 
 import Foundation
 import Hummingbird
-
+/*
 struct AttestationResponse: HBResponseCodable {
     let id: UUID
     let challengeID: String
     let response: String
 }
+*/

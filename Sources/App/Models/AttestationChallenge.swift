@@ -8,7 +8,7 @@
 import Foundation
 import Hummingbird
 import CryptoKit
-
+/*
 struct AttestationChallenge: HBResponseCodable {
     let creationDate: Date
     let expirationDate: Date
@@ -22,3 +22,4 @@ struct AttestationChallenge: HBResponseCodable {
         self.challenge = Data(AES.GCM.Nonce()).base64EncodedString()
     }
 }
+*/

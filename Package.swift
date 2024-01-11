@@ -16,6 +16,9 @@ let package = Package(
         .package(url: "https://github.com/swift-server/async-http-client.git", from: "1.19.0"),
         .package(url: "https://github.com/apple/app-store-server-library-swift.git", from: "1.0.0"),
         .package(url: "https://github.com/ronaldmannak/AppAttest.git", branch: "main"),
+        .package(url: "https://github.com/vapor/jwt-kit.git", from: "4.0.0"),
+//        .package(url: "https://github.com/hummingbird-project/hummingbird-fluent.git", from: "1.0.0"),
+//        .package(url: "https://github.com/vapor/fluent-sqlite-driver.git", from: "4.0.0"),
     ],
     targets: [
         .executableTarget(name: "App",
@@ -26,6 +29,9 @@ let package = Package(
                 .product(name: "AsyncHTTPClient", package: "async-http-client"),
                 .product(name: "AppStoreServerLibrary", package: "app-store-server-library-swift"),
                 .product(name: "AppAttest", package: "AppAttest"),
+                .product(name: "JWTKit", package: "jwt-kit"),
+//                .product(name: "FluentKit", package: "fluent-kit"),
+//                .product(name: "FluentSQLiteDriver", package: "fluent-sqlite-driver"),
             ],
             swiftSettings: [
                 // Enable better optimizations when building in Release configuration. Despite the use of

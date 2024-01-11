@@ -9,7 +9,7 @@ import Foundation
 import Hummingbird
 import HummingbirdAuth
 import AppAttest
-
+/*
 // TODO: refactor to HBAsyncAuthenticator?
 class AttestationController {
         
@@ -64,3 +64,4 @@ class AttestationController {
         return HBResponse(status: .accepted)
     }
 }
+*/
