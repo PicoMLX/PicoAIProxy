@@ -2,7 +2,9 @@
 
 ## Configuring SwiftOpenAIProxy
 
-SwiftOpenAIProxy can be customized using a combination of arguments and environment variables. Both can be edited in Xcode using the Target -> Edit schema.
+SwiftOpenAIProxy can be customized using a combination of arguments and environment variables. Both can be edited in Xcode using the Target -> Edit scheme.
+
+![Xcode screenshot of edit scheme menu](Images/EditScheme.png)
 
 ### Arguments passed on launch
 
