@@ -84,21 +84,21 @@
       <EnvironmentVariables>
          <EnvironmentVariable
             key = "OpenAI-APIKey"
-            value = ""
+            value = "sk-..."
             isEnabled = "YES">
          </EnvironmentVariable>
          <EnvironmentVariable
             key = "OpenAI-Organization"
+            value = "org-..."
+            isEnabled = "YES">
+         </EnvironmentVariable>
+         <EnvironmentVariable
+            key = "appTeamId"
             value = ""
             isEnabled = "YES">
          </EnvironmentVariable>
          <EnvironmentVariable
-            key = "appTeamID"
-            value = ""
-            isEnabled = "YES">
-         </EnvironmentVariable>
-         <EnvironmentVariable
-            key = "appBundleID"
+            key = "appBundleId"
             value = ""
             isEnabled = "YES">
          </EnvironmentVariable>
@@ -110,6 +110,31 @@
          <EnvironmentVariable
             key = "allowKeyPassthrough"
             value = "1"
+            isEnabled = "YES">
+         </EnvironmentVariable>
+         <EnvironmentVariable
+            key = "JWTPrivateKey"
+            value = ""
+            isEnabled = "YES">
+         </EnvironmentVariable>
+         <EnvironmentVariable
+            key = "IAPPrivateKey"
+            value = ""
+            isEnabled = "YES">
+         </EnvironmentVariable>
+         <EnvironmentVariable
+            key = "IAPIssuerId"
+            value = ""
+            isEnabled = "YES">
+         </EnvironmentVariable>
+         <EnvironmentVariable
+            key = "IAPKeyId"
+            value = ""
+            isEnabled = "YES">
+         </EnvironmentVariable>
+         <EnvironmentVariable
+            key = "appAppleId"
+            value = ""
             isEnabled = "YES">
          </EnvironmentVariable>
       </EnvironmentVariables>

@@ -15,8 +15,8 @@
         "repositoryURL": "https://github.com/apple/app-store-server-library-swift.git",
         "state": {
           "branch": null,
-          "revision": "75ef781e9a09ecba07645930040215d0e2d078df",
-          "version": "1.0.0"
+          "revision": "936ded540e680a5e64181e8a3c72bae0614c59e2",
+          "version": "1.0.1"
         }
       },
       {

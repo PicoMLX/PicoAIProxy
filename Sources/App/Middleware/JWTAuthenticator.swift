@@ -27,6 +27,11 @@ struct JWTPayloadData: JWTPayload, Equatable, HBAuthenticatable {
     }
 }
 
+/// Stub for JWTAuthenticator. We're not returning anything, but need the stub to make JWTAuthenticator conform HBMiddleware
+struct Stub: HBAuthenticatable {
+    let string: String
+}
+
 struct JWTAuthenticator: HBAsyncAuthenticator {
     
     let jwtSigners: JWTSigners
@@ -50,9 +55,10 @@ struct JWTAuthenticator: HBAsyncAuthenticator {
         self.jwtSigners.use(signer, kid: kid)
     }
 
-    func authenticate(request: HBRequest) async throws -> AppStoreReceipt? {
+    func authenticate(request: HBRequest) async throws -> Stub? {
         
-        // 1. Get JWT from bearer authorization
+        // 1. Get JWT token from bearer authorization header
+        //    If no token is present, return unauthorized error
         guard let jwtToken = request.authBearer?.token else {
             throw HBHTTPError(.unauthorized)
         }
@@ -67,7 +73,7 @@ struct JWTAuthenticator: HBAsyncAuthenticator {
             return nil
         }
 
-        // 3. Verify token
+        // 3. Verify token is a valid token created by SwiftOpenAIProxy
         let payload: JWTPayloadData
         do {
             payload = try self.jwtSigners.verify(jwtToken, as: JWTPayloadData.self)
@@ -76,26 +82,7 @@ struct JWTAuthenticator: HBAsyncAuthenticator {
             throw HBHTTPError(.unauthorized)
         }
 
-        // TODO: track users
-        // 4. If we want to track usage per user,
-        
-        // 5. Return an empty receipt for now
-        return AppStoreReceipt()
-        
-        /*
-        // check if user exists and return if it exists
-        if let existingUser = try await User.query(on: request.db)
-            .filter(\.$name == payload.subject.value)
-            .first() {
-            return existingUser
-        }
-
-        // if user doesn't exist then JWT was created by a another service and we should create a user
-        // for it, with no associated password
-        let user = User(id: nil, name: payload.subject.value, passwordHash: nil)
-        try await user.save(on: request.db)
-
-        return user
-         */
+        // 4. Token is valid, we're done.
+        return nil
     }
 }

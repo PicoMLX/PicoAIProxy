@@ -12,7 +12,6 @@ struct OpenAIKeyMiddleware: HBMiddleware {
     func apply(to request: Hummingbird.HBRequest, next: Hummingbird.HBResponder) -> NIOCore.EventLoopFuture<Hummingbird.HBResponse> {
         
         guard let org = HBEnvironment().get("OpenAI-Organization"), let apiKey = HBEnvironment().get("OpenAI-APIKey"), !org.isEmpty, !apiKey.isEmpty else {
-            
             return request.failure(.internalServerError, message: "apiKey and organization environment variables need to be set")
         }
         
@@ -26,31 +25,3 @@ struct OpenAIKeyMiddleware: HBMiddleware {
         return next.respond(to: request)
     }
 }
-
-/*
- /// This is the async version of the OpenAIKey middleware. This version will only work if ProxyServerMiddleware is refactored to use async as well
-struct OpenAIKeyMiddleware: HBAsyncMiddleware {
-    func apply(to request: HBRequest, next: HBResponder) async throws -> HBResponse {
-        
-        guard let org = HBEnvironment().get("organization"), let apiKey = HBEnvironment().get("apiKey"), !org.isEmpty, !apiKey.isEmpty else {
-            throw HBHTTPError(.internalServerError, message: "apiKey and organization environment variables need to be set")
-        }
-        
-        var headers = request.headers
-        headers.replaceOrAdd(name: "OpenAI-Organization", value: org)
-        headers.replaceOrAdd(name: "Authorization", value: "Bearer \(apiKey)")
-        
-        let head = HTTPRequestHead(version: request.version, method: request.method, uri: request.uri.string, headers: headers)
-        let request = HBRequest(head: head, body: request.body, application: request.application, context: request.context)
-        
-        var response = try await next.respond(to: request)
-
-//        response.headers.replaceOrAdd(name: "OpenAI-Organization", value: org)
-//        response.headers.replaceOrAdd(name: "Authorization", value: "Bearer \(apiKey)")
-
-        
-//        response.updatedRequest.add(name: "My-App-Version", value: "v2.5.9")
-        return response
-    }
-}
-*/

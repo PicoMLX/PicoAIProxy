@@ -15,88 +15,39 @@ extension HBApplication {
     /// setup the encoder/decoder
     /// add your routes
     func configure(_ args: AppArguments) async throws {
-        
+            
+        // 1. Set up JSON encoder and decoder
         self.encoder = JSONEncoder()
         self.decoder = JSONDecoder()
         (self.encoder as! JSONEncoder).dateEncodingStrategy = .iso8601
-        
-//        self.httpClient = HTTPClient(eventLoopGroupProvider: .singleton)
         self.httpClient = HTTPClient(eventLoopGroupProvider: .shared(self.eventLoopGroup))
         
-        // Add logging middleware
+        // 2. Add logging middleware
         self.logger.logLevel = .info
         self.middleware.add(HBLogRequestsMiddleware(.info))
-        
-        //
         self.middleware.add(HBLogRequestsMiddleware(.debug))
-        self.middleware.add(
-            HBCORSMiddleware(
-                allowOrigin: .originBased,
-                allowHeaders: ["Accept", "Authorization", "Content-Type", "Origin"],
-                allowMethods: [.GET, .OPTIONS]
-            ))
-        
-        // add Fluent
-//        self.addFluent()
-//        // add sqlite database
-//        if arguments.inMemoryDatabase {
-//            self.fluent.databases.use(.sqlite(.memory), as: .sqlite)
-//        } else {
-//            self.fluent.databases.use(.sqlite(.file("db.sqlite")), as: .sqlite)
-//        }
-//        // add migrations
-//        self.fluent.migrations.add(CreateUser())
-//        // migrate
-//        if arguments.migrate || arguments.inMemoryDatabase {
-//            try await self.fluent.migrate()
-//        }
-        
-        
-        // Add App attestation middleware
-//        let attestationController = AttestationController()
-//        attestationController.addRoutes(to: self.router.group("attestation"))
-//        self.middleware.add(AttestationMiddleware(attestationController: attestationController))        
-        
-        // Add App Store middleware
-//        let appStoreController = AppStoreController()
-//        appStoreController.addRoutes(to: self.router.group("appstore"))
-        
-        // fetch JWT private key from environment
+
+        // 3. Fetch JWT private key from environment and set up JWT Signers
         guard let jwtKey = HBEnvironment().get("JWTPrivateKey"),
               !jwtKey.isEmpty else {
             self.logger.error("JWTPrivateKey environment variable must be set")
             throw HBHTTPError(.internalServerError) 
         }
-        
-        // Set up JWT authenticator
         let jwtAuthenticator = JWTAuthenticator()
         let jwtLocalSignerKid = JWKIdentifier("_aiproxy_local_")
         jwtAuthenticator.useSigner(.hs256(key: jwtKey), kid: jwtLocalSignerKid)
 
-        // Add AppStoreController routes
+        // 4. Add AppStoreController routes to verify client's purchase and send JWT token to client
         let appStoreController = AppStoreController(jwtSigners: jwtAuthenticator.jwtSigners, kid: jwtLocalSignerKid)
         appStoreController.addRoutes(to: self.router.group("appstore"))
         
-        // Add AppStore
-//        self.middleware.add(AppStoreMiddleware())
+        // 5. Add JWT authenticator. Will return unauthorized error if no or invalid JWT token was received
         self.middleware.add(jwtAuthenticator)
         
-//        router.get("/") { _ in
-//            return "Hello"
-//        }
-//        UserController(jwtSigners: jwtAuthenticator.jwtSigners, kid: jwtLocalSignerKid).addRoutes(to: router.group("user"))
-//
-//        router.group("auth")
-//            .add(middleware: jwtAuthenticator)
-//            .get("/") { request in
-//                let user = try request.authRequire(User.self)
-//                return "Authenticated (Subject: \(user.name))"
-//            }
-        
-        // OpenAI API key middleware
+        // 6. Add OpenAI API key middleware. This middleware will add the OpenAI org and API key in the header of the request
         self.middleware.add(OpenAIKeyMiddleware())
         
-        // Add Proxy middleware
+        // 7. Add Proxy middleware. If you don't need any authentication, you can remove steps 3 through 6 above
         self.middleware.add(
             HBProxyServerMiddleware(
                 httpClient: httpClient,
