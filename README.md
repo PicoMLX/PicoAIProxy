@@ -164,6 +164,10 @@ Optionally: Track users using [app account token](https://developer.apple.com/do
 
 SwiftOpenAIProxyServer will automatically extract the app account token from the receipts.
 
+## How to deploy
+
+Coming soon
+
 ## Apps using SwiftOpenAIProxy
 
 - Pico
