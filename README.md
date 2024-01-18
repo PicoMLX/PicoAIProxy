@@ -15,6 +15,7 @@ SwiftOpenAIProxy is designed to be compatible with any existing OpenAI library. 
 - Once the receipt is validated, SwiftOpenAIProxy issues a JWT token the client can use for subsequent calls
 - SwiftOpenAIProxy is API agnostic and forwards any request to https://api.openai.com.
 - The forwarding endpoint is customizable, allowing redirection to various non-OpenAI API endpoints
+- Optionally forward calls with a valid OpenAI key and org without validation
 - SwiftOpenAIProxy can optionally track individual users through App Account IDs. This requires the client app to send a unique UUID to the [purchase](https://developer.apple.com/documentation/storekit/product/3791971-purchase) method.
 
 ### What's implemented
@@ -101,10 +102,67 @@ The target is the site where all traffic is forwarded to. You can change the tar
 | --- | --- | --- |
 | JWTPrivateKey |  | https://jwt.io/introduction |
 
-
 ## How to call SwiftOpenAIProxy from your iOS or macOS app
 
-Coming soon
+Using [CleverBird](http://github.com/btfranklin/CleverBird/issues)
+```Swift
+    import Get
+    import CleverBird
+
+    var token: Token? = nil
+
+    func completion(prompt: String) async await {
+        let openAIConnection = OpenAIAPIConnection(apiKey: token.token, organization: "", scheme: "http", host: "localhost", port: 8081)
+        let chatThread = ChatThread()
+            .addSystemMessage(content: "You are a helpful assistant.")
+            .addUserMessage(content: "Who won the world series in 2020?")
+        do {
+            let completion = try await chatThread.complete(using: openAIAPIConnection)
+        } catch CleverBirdError.unauthorized {
+            token = try await fetchToken()
+            try await completion(prompt: String)            
+        }      
+    }
+    
+    func fetchToken() async throws -> Token {
+        let body: String?
+
+        // Fetch app store receipt
+        if let appStoreReceiptURL = Bundle.main.appStoreReceiptURL,
+           FileManager.default.fileExists(atPath: appStoreReceiptURL.path),
+           let receiptData = try? Data(contentsOf: appStoreReceiptURL, options: .alwaysMapped) {
+            body = receiptData.base64EncodedString(options: [])
+        } else {
+            // when running the app in Xcode Sandbox, there will be no receipt. In sandbox, SwiftOpenAIProxy will accept
+            // the receipt Id.
+            body = "transaction Id here"
+        }
+        
+        let tokenRequest = Request<Token>(
+            path: "appstore",
+            method: .post,
+            body: body,
+            headers: nil)
+        let tokenResponse = try await AIClient.openAIAPIConnection.client.send(tokenRequest)
+        return tokenResponse.value
+    }
+
+    struct Token: Codable {
+        let token: String
+    }
+```
+
+Optionally: Track users using [app account token](https://developer.apple.com/documentation/storekit/product/purchaseoption/3749440-appaccounttoken)
+```Swift
+ // Create new UUID
+ let id = UUID()
+ // Add id to user account
+
+ // Purchase subscription
+ let result = try await product.purchase(options: [.appAccountToken(idUUID)])
+```
+
+SwiftOpenAIProxyServer will automatically extract the app account token from the receipts.
 
 ## Apps using SwiftOpenAIProxy
 
