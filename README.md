@@ -18,6 +18,12 @@ SwiftOpenAIProxy is designed to be compatible with any existing OpenAI library. 
 - Optionally forward calls with a valid OpenAI key and org without validation
 - SwiftOpenAIProxy can optionally track individual users through App Account IDs. This requires the client app to send a unique UUID to the [purchase](https://developer.apple.com/documentation/storekit/product/3791971-purchase) method.
 
+### Supported APIs
+
+| API | Completion | Streaming | Embeddings | Audio | Images |
+| --- | --- | --- | --- | --- | --- |
+| [OpenAI](https://platform.openai.com/docs/models) | ✅ | ✅ | ✅ | ✅ | ✅ |
+
 ### What's implemented
 - [x] Reverse proxy server forwarding calls to OpenAI (or any other endpoint)
 - [x] Authenticates using App Store receipt validation
