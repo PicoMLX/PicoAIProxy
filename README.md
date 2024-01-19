@@ -32,6 +32,10 @@ SwiftOpenAIProxy is designed to be compatible with any existing OpenAI library. 
 - [ ] Account management and black list
 - [ ] Automatically translate and forward traffic to other AI APIs based on model setting in API call
 
+## Requirements
+
+An [OpenAI API key](https://openai.com/blog/openai-api).
+
 ## How to Set Up SwiftOpenAIProxy
 
 To set up SwiftOpenAIProxy, you need:
