@@ -38,7 +38,7 @@ RUN [ -d /build/Public ] && { mv /build/Public ./Public && chmod -R a-w ./Public
 # ================================
 # Run image
 # ================================
-FROM swift:5.5-slim
+FROM swift:5.6-slim
 
 # Make sure all system packages are up to date.
 RUN export DEBIAN_FRONTEND=noninteractive DEBCONF_NONINTERACTIVE_SEEN=true && \
