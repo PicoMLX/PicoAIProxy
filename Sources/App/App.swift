@@ -15,7 +15,7 @@ struct HummingbirdArguments: AsyncParsableCommand, AppArguments {
     var hostname: String = "0.0.0.0"
 
     @Option(name: .shortAndLong)
-    var port: Int = 443
+    var port: Int = 8080
 
     @Option(name: .shortAndLong)
     var location: String = ""

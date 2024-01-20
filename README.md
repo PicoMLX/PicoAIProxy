@@ -76,10 +76,10 @@ Both environment variables and arguments can be edited in Xcode using the Target
 | Argument | Default value | Default in scheme |
 | --- | --- | --- |
 | --hostname | 0.0.0.0 | |
-| --port | 443 | 8081 |
+| --port | 8080 | 8080 |
 | --target | https://api.openai.com | |
 
-When launched from Xcode, SwiftOpenAIProxy is accessible at http://localhost:8081. When deployed in the cloud, SwiftOpenAIProxy will default to port 443 (https). 
+When launched from Xcode, SwiftOpenAIProxy is accessible at http://localhost:8080. When deployed in the cloud, SwiftOpenAIProxy will default to port 8080. 
 
 All traffic will be forwarded to `target`. The 'target' can be modified to direct traffic to any API, regardless of whether it conforms to the OpenAI API. , as long as your client application is compatible.
 The target is the site where all traffic is forwarded to. You can change the target to any API, even if the API doesn't conform OpenAI (so long as your client app does).
@@ -107,6 +107,12 @@ The target is the site where all traffic is forwarded to. You can change the tar
 | IAPIssuerId | IAP Issuer Id | https://appstoreconnect.apple.com/access/api/subs |
 | IAPKeyId | IAP Key Id | https://appstoreconnect.apple.com/access/api/subs |
 
+The `IAPPrivateKey` in SwiftOpenAIProxy is formatted in PKCS #8, which is a multi-line format. The format begins with `-----BEGIN PRIVATE KEY-----` and ends with `-----END PRIVATE KEY-----`. Between these markers, the key comprises four lines of base64-encoded data. However, while Xcode supports environment variables with newlines, many hosting services, such as [Railway](https://railway.app), do not.
+
+To ensure compatibility across different environments, SwiftOpenAIProxy requires the private key to be condensed into a single line. This is achieved by replacing all newline characters with `\\n` (double backslash followed by `n`).
+
+A correctly formatted `IAPPrivateKey` for SwiftOpenAIProxy should appear as a single line: `-----BEGIN PRIVATE KEY-----\\n<LINE1>\\n<LINE2>\\n<LINE3>\\n<LINE4>\\n-----END PRIVATE KEY-----`, where `<LINE1>`, `<LINE2>`, `<LINE3>`, and `<LINE4>` represent the base64-encoded data of the key.
+
 #### JWT environment variables
 | Variable | Description | reference |
 | --- | --- | --- |
@@ -122,7 +128,7 @@ Using [CleverBird](http://github.com/btfranklin/CleverBird/issues)
     var token: Token? = nil
 
     func completion(prompt: String) async await {
-        let openAIConnection = OpenAIAPIConnection(apiKey: token.token, organization: "", scheme: "http", host: "localhost", port: 8081)
+        let openAIConnection = OpenAIAPIConnection(apiKey: token.token, organization: "", scheme: "http", host: "localhost", port: 8080)
         let chatThread = ChatThread()
             .addSystemMessage(content: "You are a helpful assistant.")
             .addUserMessage(content: "Who won the world series in 2020?")

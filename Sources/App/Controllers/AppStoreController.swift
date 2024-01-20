@@ -31,7 +31,7 @@ struct AppStoreController {
         //    To create a private key, see:
         //    https://developer.apple.com/documentation/appstoreserverapi/creating_api_keys_to_use_with_the_app_store_server_api
         //    and https://developer.apple.com/wwdc23/10143
-        guard let iapKey = HBEnvironment().get("IAPPrivateKey"),
+        guard let iapKey = HBEnvironment().get("IAPPrivateKey")?.replacingOccurrences(of: "\\\\n", with: "\n"),
               !iapKey.isEmpty,
               let iapIssuerId = HBEnvironment().get("IAPIssuerId"),
               !iapIssuerId.isEmpty,
@@ -93,7 +93,8 @@ struct AppStoreController {
                 // No transaction wasn't found. Try sandbox for
                 return try await login(request, iapKey: iapKey, iapKeyId: iapKeyId, iapIssuerId: iapIssuerId, bundleId: bundleId, appAppleId: appAppleId, environment: .sandbox)
             } else {
-                print("\(statusCode ?? -1): \(errorMessage ?? "Unknown error")")
+                print(body)
+                print("\(statusCode ?? -1): \(errorMessage ?? "Unknown error"), \(rawApiError), \(causedBy)")
                 throw HBHTTPError(.unauthorized)
             }
         }
