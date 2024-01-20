@@ -24,15 +24,15 @@ struct HummingbirdArguments: AsyncParsableCommand, AppArguments {
     var target: String = "https://api.openai.com"
 
     func run() async throws {
+        
+        // Use Railway.app's port
+        let port = Int(HBEnvironment().get("PORT") ?? "8080") ?? 8080
         let app = HBApplication(
             configuration: .init(
                 address: .hostname(self.hostname, port: port),
                 serverName: "SwiftOpenAIProxyServer"
             )
         )
-        if let port = HBEnvironment().get("PORT") {
-            app.logger.info("Env var port is \(port)")
-        }
         try await app.configure(self)
         try app.start()
         await app.asyncWait()
