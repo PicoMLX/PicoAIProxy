@@ -30,6 +30,9 @@ struct HummingbirdArguments: AsyncParsableCommand, AppArguments {
                 serverName: "SwiftOpenAIProxyServer"
             )
         )
+        if let port = HBEnvironment().get("PORT") {
+            app.logger.info("Env var port is \(port)")
+        }
         try await app.configure(self)
         try app.start()
         await app.asyncWait()
