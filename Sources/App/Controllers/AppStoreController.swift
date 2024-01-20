@@ -42,6 +42,7 @@ struct AppStoreController {
               let appAppleIdString = HBEnvironment().get("appAppleId"),
               let appAppleId = Int64(appAppleIdString)
         else {
+            request.logger.error("Missing environment variable(s): IAPPrivateKey, IAPIssuerId, IAPKeyId, appBundleId and/or appAppleId")
             throw HBHTTPError(.internalServerError, message: "IAPPrivateKey, IAPIssuerId, IAPKeyId and/or appBundleId environment variables not set")
         }
         
