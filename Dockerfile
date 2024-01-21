@@ -1,7 +1,7 @@
 # ================================
 # Build image
 # ================================
-FROM swift:5.8 as build
+FROM swift:5.9 as build
 
 # Install OS updates
 RUN export DEBIAN_FRONTEND=noninteractive DEBCONF_NONINTERACTIVE_SEEN=true \
@@ -31,14 +31,15 @@ WORKDIR /staging
 # Copy main executable to staging area
 RUN cp "$(swift build --package-path /build -c release --show-bin-path)/App" ./
 
-# Copy any resouces from the public directory and views directory if the directories exist
+# Copy any resources from the public directory and views directory if the directories exist
 # Ensure that by default, neither the directory nor any of its contents are writable.
 RUN [ -d /build/Public ] && { mv /build/Public ./Public && chmod -R a-w ./Public; } || true
+RUN [ -d /build/Sources/App/Resources ] && { mv /build/Sources/App/Resources ./Resources && chmod -R a-w ./Resources; } || true
 
 # ================================
 # Run image
 # ================================
-FROM swift:5.8-slim
+FROM swift:5.9-slim
 
 # Make sure all system packages are up to date.
 RUN export DEBIAN_FRONTEND=noninteractive DEBCONF_NONINTERACTIVE_SEEN=true && \
