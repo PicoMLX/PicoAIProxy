@@ -69,6 +69,7 @@ struct AppStoreController {
         //    However, the receipt is not available when testing in Xcode Sandbox, so the server accepts a
         //    transaction Id as well
         guard let buffer = request.body.buffer, let body = buffer.getString(at: buffer.readerIndex, length: buffer.readableBytes) else {
+            request.logger.error("/appstore invoked with empty body")
             throw HBHTTPError(.unauthorized)
         }
         let transactionId: String
@@ -94,8 +95,7 @@ struct AppStoreController {
                 // No transaction wasn't found. Try sandbox for
                 return try await login(request, iapKey: iapKey, iapKeyId: iapKeyId, iapIssuerId: iapIssuerId, bundleId: bundleId, appAppleId: appAppleId, environment: .sandbox)
             } else {
-                print(body)
-                print("\(statusCode ?? -1): \(errorMessage ?? "Unknown error"), \(rawApiError), \(causedBy)")
+                request.logger.error("get all subscriptions failed. Error: \(statusCode ?? -1): \(errorMessage ?? "Unknown error"), \(rawApiError), \(causedBy)")
                 throw HBHTTPError(.unauthorized)
             }
         }
@@ -113,13 +113,13 @@ struct AppStoreController {
                 throw HBHTTPError(.unauthorized)
             }
         case .failure(let statusCode, let rawApiError, let apiError, let errorMessage, let causedBy):
-            print("\(statusCode ?? -1): \(errorMessage ?? "Unknown error")")
+            request.logger.error("TransactionInfo failed. Error: \(statusCode ?? -1) \(errorMessage ?? "Unknown error")")
             throw HBHTTPError(.unauthorized)
         }
                 
         // 5. Get signed transaction
         let appAccountToken: String
-        let rootCertificates = try loadAppleRootCertificates() // TODO: add certificates
+        let rootCertificates = try loadAppleRootCertificates(request: request) // TODO: add certificates
         let verifier = try SignedDataVerifier(rootCertificates: rootCertificates, bundleId: bundleId, appAppleId: appAppleId, environment: environment, enableOnlineChecks: true)
         let verifyResponse = await verifier.verifyAndDecodeTransaction(signedTransaction: signedTransaction)
         
@@ -137,7 +137,8 @@ struct AppStoreController {
                 // Handle case when no app account token is found
                 appAccountToken = UUID().uuidString
             }
-        case .invalid(_):
+        case .invalid(let error):
+            request.logger.error("Verifying transaction failed. Error: \(error)")
             throw HBHTTPError(.unauthorized)
         }
         
@@ -151,20 +152,49 @@ struct AppStoreController {
         ]
     }
     
-    private func loadAppleRootCertificates() throws -> [Foundation.Data] {
+//    #if os(Linux)
+//    
+//    private func loadAppleRootCertificates() throws -> [Foundation.Data] {
+//        return [
+//            try loadData(file: "AppleComputerRootCertificate.cer"),
+//            try loadData(file: "AppleIncRootCertificate.cer"),
+//            try loadData(file: "AppleRootCA-G2.cer"),
+//            try loadData(file: "AppleRootCA-G3.cer"),
+//        ].compactMap { $0 }
+//    }
+//    
+//    private func loadData(file: String) throws -> Foundation.Data? {
+//        let fs = FileManager()
+//        let directory = "Resources/"
+////        let directory = "App/Resources"
+//        let data = fs.contents(atPath: directory + file)
+//        
+//        guard let data = data else {
+//            throw HBHTTPError(.internalServerError, message: "Could not find \(directory)\(file)")
+//        }
+//        
+//        return data
+//    }
+//    
+//    #else
+    
+    private func loadAppleRootCertificates(request: HBRequest) throws -> [Foundation.Data] {
         return [
-            try loadData(url: Bundle.module.url(forResource: "AppleComputerRootCertificate", withExtension: "cer")),
-            try loadData(url: Bundle.module.url(forResource: "AppleIncRootCertificate", withExtension: "cer")),
-            try loadData(url: Bundle.module.url(forResource: "AppleRootCA-G2", withExtension: "cer")),
-            try loadData(url: Bundle.module.url(forResource: "AppleRootCA-G3", withExtension: "cer")),
+            try loadData(url: Bundle.module.url(forResource: "AppleComputerRootCertificate", withExtension: "cer"), request: request),
+            try loadData(url: Bundle.module.url(forResource: "AppleIncRootCertificate", withExtension: "cer"), request: request),
+            try loadData(url: Bundle.module.url(forResource: "AppleRootCA-G2", withExtension: "cer"), request: request),
+            try loadData(url: Bundle.module.url(forResource: "AppleRootCA-G3", withExtension: "cer"), request: request),
         ]
     }
     
-    private func loadData(url: URL?) throws -> Foundation.Data {
+    private func loadData(url: URL?, request: HBRequest) throws -> Foundation.Data {
         guard let url = url,
               let rootData = try? Data(Data(contentsOf: url)) else {
+            request.logger.error("File missing: \(url?.absoluteString ?? "invalid url")")
             throw HBHTTPError(.internalServerError)
         }
         return rootData
     }
+    
+//    #endif
 }
