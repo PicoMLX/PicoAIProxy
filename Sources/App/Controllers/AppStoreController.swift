@@ -6,6 +6,9 @@
 //
 
 import Foundation
+#if os(Linux)
+import FoundationNetworking
+#endif
 import Hummingbird
 import HummingbirdAuth
 import AppStoreServerLibrary
@@ -89,13 +92,14 @@ struct AppStoreController {
         case .success(let response):
             // The App Store server has found the user's subscription
             // TODO: act based on type of subscription
+            print(response)
             break
         case .failure(let statusCode, let rawApiError, let apiError, let errorMessage, let causedBy):
             if statusCode == 404 && environment == .production {
                 // No transaction wasn't found. Try sandbox for
                 return try await login(request, iapKey: iapKey, iapKeyId: iapKeyId, iapIssuerId: iapIssuerId, bundleId: bundleId, appAppleId: appAppleId, environment: .sandbox)
             } else {
-                request.logger.error("get all subscriptions failed. Error: \(statusCode ?? -1): \(errorMessage ?? "Unknown error"), \(rawApiError), \(causedBy)")
+                request.logger.error("get all subscriptions failed. Error: \(statusCode ?? -1): \(errorMessage ?? "Unknown error"), \(String(describing: rawApiError)) \(String(describing: apiError)), \(String(describing: causedBy))")
                 throw HBHTTPError(.unauthorized)
             }
         }
@@ -112,7 +116,7 @@ struct AppStoreController {
             } else {
                 throw HBHTTPError(.unauthorized)
             }
-        case .failure(let statusCode, let rawApiError, let apiError, let errorMessage, let causedBy):
+        case .failure(let statusCode, _, _, let errorMessage, _):
             request.logger.error("TransactionInfo failed. Error: \(statusCode ?? -1) \(errorMessage ?? "Unknown error")")
             throw HBHTTPError(.unauthorized)
         }
@@ -146,55 +150,43 @@ struct AppStoreController {
         let payload = JWTPayloadData(
             subject: .init(value: appAccountToken),
             expiration: .init(value: Date(timeIntervalSinceNow: 12 * 60 * 60)) // 12 hours
+            // TODO: move to env var tokenExpiration
         )
         return try [
             "token": self.jwtSigners.sign(payload, kid: self.kid),
         ]
     }
     
-//    #if os(Linux)
-//    
-//    private func loadAppleRootCertificates() throws -> [Foundation.Data] {
-//        return [
-//            try loadData(file: "AppleComputerRootCertificate.cer"),
-//            try loadData(file: "AppleIncRootCertificate.cer"),
-//            try loadData(file: "AppleRootCA-G2.cer"),
-//            try loadData(file: "AppleRootCA-G3.cer"),
-//        ].compactMap { $0 }
-//    }
-//    
-//    private func loadData(file: String) throws -> Foundation.Data? {
-//        let fs = FileManager()
-//        let directory = "Resources/"
-////        let directory = "App/Resources"
-//        let data = fs.contents(atPath: directory + file)
-//        
-//        guard let data = data else {
-//            throw HBHTTPError(.internalServerError, message: "Could not find \(directory)\(file)")
-//        }
-//        
-//        return data
-//    }
-//    
-//    #else
-    
     private func loadAppleRootCertificates(request: HBRequest) throws -> [Foundation.Data] {
+        #if os(Linux)
+        // Linux doesn't have app bundles, so we're copying the certificates in the Dockerfile to /app/Resources and load them manually
+        return [
+            try loadData(url: URL(string: "/app/Resources/AppleComputerRootCertificate.cer"), request: request),
+            try loadData(url: URL(string: "/app/Resources/AppleIncRootCertificate.cer"), request: request),
+            try loadData(url: URL(string: "/app/Resources/AppleRootCA-G2.cer"), request: request),
+            try loadData(url: URL(string: "/app/Resources/AppleRootCA-G3.cer"), request: request),
+        ].compactMap { $0 }
+        #else
         return [
             try loadData(url: Bundle.module.url(forResource: "AppleComputerRootCertificate", withExtension: "cer"), request: request),
             try loadData(url: Bundle.module.url(forResource: "AppleIncRootCertificate", withExtension: "cer"), request: request),
             try loadData(url: Bundle.module.url(forResource: "AppleRootCA-G2", withExtension: "cer"), request: request),
             try loadData(url: Bundle.module.url(forResource: "AppleRootCA-G3", withExtension: "cer"), request: request),
-        ]
+        ].compactMap { $0 }
+        #endif
     }
     
-    private func loadData(url: URL?, request: HBRequest) throws -> Foundation.Data {
-        guard let url = url,
-              let rootData = try? Data(Data(contentsOf: url)) else {
+    private func loadData(url: URL?, request: HBRequest) throws -> Foundation.Data? {        
+        let fs = FileManager()
+        guard let url = url, fs.fileExists(atPath: url.path) else {
             request.logger.error("File missing: \(url?.absoluteString ?? "invalid url")")
             throw HBHTTPError(.internalServerError)
         }
-        return rootData
+                
+        guard let data = fs.contents(atPath: url.path) else {
+            request.logger.error("Can't read data from \(url.absoluteString)")
+            return nil
+        }
+        return data
     }
-    
-//    #endif
 }

@@ -182,7 +182,7 @@ SwiftOpenAIProxyServer will automatically extract the app account token from the
 
 ## How to deploy
 
-Coming soon
+[![Deploy on Railway](https://railway.app/button.svg)](https://railway.app/template/ocPcV2?referralCode=WKPLp3)
 
 ## Apps using SwiftOpenAIProxy
 

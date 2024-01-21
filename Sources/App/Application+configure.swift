@@ -26,6 +26,7 @@ extension HBApplication {
         self.logger.logLevel = .info
         self.middleware.add(HBLogRequestsMiddleware(.info))
         self.middleware.add(HBLogRequestsMiddleware(.debug))
+        self.middleware.add(HBLogRequestsMiddleware(.error))
 
         // 3. Fetch JWT private key from environment and set up JWT Signers
         guard let jwtKey = HBEnvironment().get("JWTPrivateKey"),
