@@ -74,9 +74,9 @@ struct JWTAuthenticator: HBAsyncAuthenticator {
         }
 
         // 3. Verify token is a valid token created by SwiftOpenAIProxy
-        let payload: JWTPayloadData
+//        let payload: JWTPayloadData
         do {
-            payload = try self.jwtSigners.verify(jwtToken, as: JWTPayloadData.self)
+            let payload = try self.jwtSigners.verify(jwtToken, as: JWTPayloadData.self)
         } catch {
             request.logger.debug("couldn't verify JWT token")
             throw HBHTTPError(.unauthorized)

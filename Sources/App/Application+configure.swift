@@ -3,6 +3,9 @@ import Hummingbird
 import Foundation
 import JWTKit
 import HummingbirdAuth
+import FluentKit
+import FluentSQLiteDriver
+import HummingbirdFluent
 
 public protocol AppArguments {
     var location: String { get }
@@ -28,7 +31,21 @@ extension HBApplication {
         self.middleware.add(HBLogRequestsMiddleware(.debug))
         self.middleware.add(HBLogRequestsMiddleware(.error))
 
-        // 3. Fetch JWT private key from environment and set up JWT Signers
+        // 3. Set up database
+        self.addFluent()
+//        if let inMemory = HBEnvironment().get("inMemoryDatabase"), inMemory == "1" {
+            self.fluent.databases.use(.sqlite(.memory), as: .sqlite)
+//        } else {
+//            self.fluent.databases.use(.sqlite(.file("db.sqlite")), as: .sqlite)
+//        }
+        
+        // 4. Add migrations
+        self.fluent.migrations.add(UserMigration())
+//        if arguments.migrate || arguments.inMemoryDatabase {
+            try await self.fluent.migrate()
+//        }
+        
+        // 5. Fetch JWT private key from environment and set up JWT Signers
         guard let jwtKey = HBEnvironment().get("JWTPrivateKey"),
               !jwtKey.isEmpty else {
             self.logger.error("JWTPrivateKey environment variable must be set")
@@ -38,17 +55,17 @@ extension HBApplication {
         let jwtLocalSignerKid = JWKIdentifier("_aiproxy_local_")
         jwtAuthenticator.useSigner(.hs256(key: jwtKey), kid: jwtLocalSignerKid)
 
-        // 4. Add AppStoreController routes to verify client's purchase and send JWT token to client
+        // 6. Add AppStoreController routes to verify client's purchase and send JWT token to client
         let appStoreController = AppStoreController(jwtSigners: jwtAuthenticator.jwtSigners, kid: jwtLocalSignerKid)
         appStoreController.addRoutes(to: self.router.group("appstore"))
         
-        // 5. Add JWT authenticator. Will return unauthorized error if no or invalid JWT token was received
+        // 7. Add JWT authenticator. Will return unauthorized error if no or invalid JWT token was received
         self.middleware.add(jwtAuthenticator)
         
-        // 6. Add OpenAI API key middleware. This middleware will add the OpenAI org and API key in the header of the request
+        // 8. Add OpenAI API key middleware. This middleware will add the OpenAI org and API key in the header of the request
         self.middleware.add(OpenAIKeyMiddleware())
         
-        // 7. Add Proxy middleware. If you don't need any authentication, you can remove steps 3 through 6 above
+        // 9. Add Proxy middleware. If you don't need any authentication, you can remove steps 3 through 6 above
         self.middleware.add(
             HBProxyServerMiddleware(
                 httpClient: httpClient,
