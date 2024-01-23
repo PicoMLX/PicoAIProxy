@@ -75,19 +75,6 @@ struct AppStoreAuthenticator: HBAsyncAuthenticator {
         } catch let error as HBHTTPError where error.status == .notFound {
             return try await validate(request, transactionId: transactionId, environment: .sandbox)
         }
-        
-        // 4. Check if user exists in the database
-        
-
-        // check if user exists in the database and then verify the entered password
-//        // against the one stored in the database. If it is correct then login in user
-//        let user = try await User.query(on: request.db)
-//            .filter(\.$name == basic.username)
-//            .first()
-//        // can only verify password if user has password associated with it
-//        guard let passwordHash = user?.passwordHash else { return nil }
-//        guard Bcrypt.verify(basic.password, hash: passwordHash) else { return nil }
-//        return user
     }
     
     private func validate(_ request: HBRequest, transactionId: String, environment: Environment) async throws -> User? {
@@ -95,16 +82,36 @@ struct AppStoreAuthenticator: HBAsyncAuthenticator {
         // 1. Create App Store API client
         let appStoreClient = try AppStoreServerAPIClient(signingKey: iapKey, keyId: iapKeyId, issuerId: iapIssuerId, bundleId: bundleId, environment: environment)
         
-        // 2. Use transactionId to fetch subscription from App Store
-        let currentSubscription: String
-        let allSubs = await appStoreClient.getAllSubscriptionStatuses(transactionId: transactionId)
+        // 2. Set up verifier to decode and verify JWT encoded data
+        let rootCertificates = try loadAppleRootCertificates(request: request)
+        let verifier = try SignedDataVerifier(rootCertificates: rootCertificates, bundleId: bundleId, appAppleId: appAppleId, environment: environment, enableOnlineChecks: true)
+        
+        // 3. Set up variables needed to create user
+        let user = User(appAccountId: nil, environment: environment.rawValue, productId: "", status: .expired)
+        var signedTransactionInfo: String?
+        var signedRenewalInfo: String?
+        
+        // 4. Use transactionId to fetch active subscriptions from App Store
+        let allSubs = await appStoreClient.getAllSubscriptionStatuses(transactionId: transactionId, status: [.active, .billingGracePeriod])
         switch allSubs {
         case .success(let response):
-            // The App Store server has found the user's subscription
-            // TODO: act based on type of subscription
-            print(response)
-            currentSubscription = ""
-            break
+            
+            // Loop through the subscription groups
+            response.data?.forEach { item in
+                // Loop through the transactions in each group
+                item.lastTransactions?.forEach { transaction in
+                    // We're only saving one subscription, an active one if available.
+                    // Update user.status. Make sure we don't overwrite it if the status is already .active
+                    if user.status != Status.active.rawValue, let status = transaction.status {
+                        user.status = status.rawValue
+                    }
+                    // Assuming the transactions are in ascending order, we're storing the most recent
+                    // infos. This should fetch the appAccountId even if previous transactions didn't ahve
+                    // an appAccountId set
+                    signedTransactionInfo = transaction.signedTransactionInfo
+                    signedRenewalInfo = transaction.signedRenewalInfo
+                }
+            }
         case .failure(let statusCode, let rawApiError, let apiError, let errorMessage, let causedBy):
             if statusCode == 404 && environment == .production {
                 // No transaction wasn't found. Try sandbox
@@ -115,47 +122,43 @@ struct AppStoreAuthenticator: HBAsyncAuthenticator {
                 throw HBHTTPError(HTTPResponseStatus(statusCode: statusCode ?? 500, reasonPhrase: errorMessage ?? "Unknown error"))
             }
         }
-                
-        // 3. Get transaction to fetch the user Id (app account Id)
-        let signedTransaction: String
-        let transactionResponse = await appStoreClient.getTransactionInfo(transactionId: transactionId)
-        switch transactionResponse {
-        case .success(let response):
-            if let transaction = response.signedTransactionInfo {
-                signedTransaction = transaction
-            } else {
+        
+        // 5. Parse signed transaction
+        if let signedTransaction = signedTransactionInfo {
+            let verifyResponse = await verifier.verifyAndDecodeTransaction(signedTransaction: signedTransaction)
+            
+            switch verifyResponse {
+            case .valid(let payload):
+                // Fetches app account token set by client app.
+                // Note: Token is nil when client app doesn't set appAccountToken during the purchase
+                // See https://developer.apple.com/documentation/storekit/product/3791971-purchase
+                user.appAccountId = payload.appAccountToken
+                if let productId = payload.productId {
+                    user.productId = productId
+                }
+            case .invalid(let error):
+                request.logger.error("Verifying transaction failed. Error: \(error)")
                 throw HBHTTPError(.unauthorized)
             }
-        case .failure(let statusCode, _, _, let errorMessage, _):
-            request.logger.error("TransactionInfo failed. Error: \(statusCode ?? -1) \(errorMessage ?? "Unknown error")")
-            throw HBHTTPError(.unauthorized)
         }
-                
-        // 5. Get signed transaction
-        let appAccountToken: String
-        let rootCertificates = try loadAppleRootCertificates(request: request) // TODO: add certificates
-        let verifier = try SignedDataVerifier(rootCertificates: rootCertificates, bundleId: bundleId, appAppleId: appAppleId, environment: environment, enableOnlineChecks: true)
-        let verifyResponse = await verifier.verifyAndDecodeTransaction(signedTransaction: signedTransaction)
         
-        switch verifyResponse {
-        case .valid(let payload):
-
-            // Fetches app account token set by client app.
-            // See https://developer.apple.com/documentation/storekit/product/3791971-purchase
-            if let token = payload.appAccountToken?.uuidString {
-                // Handle case where app account token is found
-                // E.g. add call to rate limiter
-                print(token)
-                appAccountToken = token
-            } else {
-                // Handle case when no app account token is found
-                appAccountToken = UUID().uuidString
+        // 6. Parse renewal info
+        if let signedRenewalInfo = signedRenewalInfo {
+            let verifyResponse = await verifier.verifyAndDecodeRenewalInfo(signedRenewalInfo: signedRenewalInfo)
+            
+            switch verifyResponse {
+            case .valid(let payload):
+                if let productId = payload.productId {
+                    user.productId = productId
+                }
+            case .invalid(let error):
+                request.logger.error("Verifying transaction failed. Error: \(error)")
+                throw HBHTTPError(.unauthorized)
             }
-        case .invalid(let error):
-            request.logger.error("Verifying transaction failed. Error: \(error)")
-            throw HBHTTPError(.unauthorized)
         }
-        return User(id: UUID(uuidString: appAccountToken), environment: environment.rawValue, subscription: currentSubscription)
+        
+        // 7. return user
+        return user
     }
     
     private func loadAppleRootCertificates(request: HBRequest) throws -> [Foundation.Data] {

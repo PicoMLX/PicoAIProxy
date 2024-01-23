@@ -8,6 +8,7 @@
 import Foundation
 import Hummingbird
 import JWTKit
+import FluentKit
 
 struct AppStoreController {
     
@@ -38,11 +39,24 @@ struct AppStoreController {
         request.logger.error("Missing environment variable(s): IAPPrivateKey, IAPIssuerId, IAPKeyId, appBundleId and/or appAppleId")
         throw HBHTTPError(.internalServerError, message: "IAPPrivateKey, IAPIssuerId, IAPKeyId and/or appBundleId environment variables not set")
     }
-    
+
+    /// Note: appAccountId can be nil. All users with an empty appAccountId
+    /// will be treated as a single user
     private func login(_ request: HBRequest) async throws -> [String: String] {
+        
+        // 1. Fetch user from AppStoreAuthenticator middleware
         let user = try request.authRequire(User.self)
+        
+        // 2. If user is a new user, add user to database
+        if try await User.query(on: request.db)
+            .filter(\.$appAccountId == user.appAccountId)
+            .first()
+             == nil {
+            try await user.save(on: request.db)
+        }
+        
         let payload = JWTPayloadData(
-            subject: .init(value: user.id?.uuidString ?? UUID().uuidString),
+            subject: .init(value: user.appAccountId?.uuidString ?? "NO_ACCOUNT"),
             expiration: .init(value: Date(timeIntervalSinceNow: 12 * 60 * 60)) // 12 hours
         )
         return try [
