@@ -41,9 +41,8 @@ extension HBApplication {
         
         // 4. Add migrations
         self.fluent.migrations.add(UserMigration())
-//        if arguments.migrate || arguments.inMemoryDatabase {
-            try await self.fluent.migrate()
-//        }
+        self.fluent.migrations.add(MessageMigration())
+        try await self.fluent.migrate()
         
         // 5. Fetch JWT private key from environment and set up JWT Signers
         guard let jwtKey = HBEnvironment().get("JWTPrivateKey"),
@@ -61,6 +60,8 @@ extension HBApplication {
         
         // 7. Add JWT authenticator. Will return unauthorized error if no or invalid JWT token was received
         self.middleware.add(jwtAuthenticator)
+        
+        self.middleware.add(RateLimiterMiddleware())
         
         // 8. Add OpenAI API key middleware. This middleware will add the OpenAI org and API key in the header of the request
         self.middleware.add(OpenAIKeyMiddleware())

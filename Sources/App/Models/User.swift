@@ -22,7 +22,7 @@ final class User: Model, HBAuthenticatable {
     
     @Field(key: "environment")
     var environment: String
-        
+    
     @Field(key: "productId")
     var productId: String
     
@@ -32,8 +32,11 @@ final class User: Model, HBAuthenticatable {
     @Field(key: "token")
     var token: String?
     
+    @Children(for: \.$user)
+    var messages: [Message]
+    
     internal init() {}
-
+    
     internal init(id: UUID? = nil, appAccountId: UUID?, environment: String, productId: String, status: AppStoreServerLibrary.Status, token: String? = nil) {
         self.id = id
         self.appAccountId = appAccountId
@@ -42,12 +45,4 @@ final class User: Model, HBAuthenticatable {
         self.status = status.rawValue
         self.token = token
     }
-
-//    internal init(from userRequest: CreateUserRequest) {
-//        self.id = nil
-//        self.name = userRequest.name
-//        self.passwordHash = userRequest.password.map { Bcrypt.hash($0, cost: 12) }
-//    }
 }
-
-// may store multiple tokens so one user with multiple devices can use 

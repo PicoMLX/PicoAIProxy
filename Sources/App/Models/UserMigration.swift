@@ -26,18 +26,3 @@ struct UserMigration: AsyncMigration {
         try await database.schema("user").delete()
     }
 }
-
-//struct UserMigration: Migration {
-//    
-//    func prepare(on database: Database) -> EventLoopFuture<Void> {
-//        return database.schema("user")
-//            .id()
-//            .field("name", .string, .required)
-//            .field("password-hash", .string)
-//            .create()
-//    }
-//
-//    func revert(on database: Database) -> EventLoopFuture<Void> {
-//        return database.schema("user").delete()
-//    }
-//}

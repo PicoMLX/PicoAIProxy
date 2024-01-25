@@ -11,6 +11,7 @@ import Hummingbird
 import HummingbirdAuth
 import JWTKit
 import NIOFoundationCompat
+import FluentKit
 
 struct JWTPayloadData: JWTPayload, Equatable, HBAuthenticatable {
     enum CodingKeys: String, CodingKey {
@@ -25,11 +26,6 @@ struct JWTPayloadData: JWTPayload, Equatable, HBAuthenticatable {
     func verify(using signer: JWTSigner) throws {
         try self.expiration.verifyNotExpired()
     }
-}
-
-/// Stub for JWTAuthenticator. We're not returning anything, but need the stub to make JWTAuthenticator conform HBMiddleware
-struct Stub: HBAuthenticatable {
-    let string: String
 }
 
 struct JWTAuthenticator: HBAsyncAuthenticator {
@@ -55,7 +51,7 @@ struct JWTAuthenticator: HBAsyncAuthenticator {
         self.jwtSigners.use(signer, kid: kid)
     }
 
-    func authenticate(request: HBRequest) async throws -> Stub? {
+    func authenticate(request: HBRequest) async throws -> User? {
         
         // 1. Get JWT token from bearer authorization header
         //    If no token is present, return unauthorized error
@@ -74,15 +70,21 @@ struct JWTAuthenticator: HBAsyncAuthenticator {
         }
 
         // 3. Verify token is a valid token created by SwiftOpenAIProxy
-//        let payload: JWTPayloadData
+        //    Fetch user from database
         do {
-            let payload = try self.jwtSigners.verify(jwtToken, as: JWTPayloadData.self)
+            let payload = try self.jwtSigners.verify(jwtToken, as: JWTPayloadData.self).subject.value
+            let appAccountId = UUID(uuidString: payload)
+            
+            let user = try await User.query(on: request.db)
+                .filter(\.$appAccountId == appAccountId)
+                .first()
+            guard let user = user else {
+                throw HBHTTPError(.notFound, message: "User not found")
+            }
+            return user
         } catch {
             request.logger.debug("couldn't verify JWT token")
             throw HBHTTPError(.unauthorized)
         }
-
-        // 4. Token is valid, we're done.
-        return nil
     }
 }
