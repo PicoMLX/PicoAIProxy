@@ -77,7 +77,7 @@
       </BuildableProductRunnable>
       <CommandLineArguments>
          <CommandLineArgument
-            argument = "--port 8081"
+            argument = "--port 8034"
             isEnabled = "YES">
          </CommandLineArgument>
       </CommandLineArguments>
@@ -89,7 +89,7 @@
          </EnvironmentVariable>
          <EnvironmentVariable
             key = "OpenAI-Organization"
-            value = "org-..."
+            value = "org..."
             isEnabled = "YES">
          </EnvironmentVariable>
          <EnvironmentVariable
@@ -99,7 +99,7 @@
          </EnvironmentVariable>
          <EnvironmentVariable
             key = "appBundleId"
-            value = ""
+            value = "com.example.app"
             isEnabled = "YES">
          </EnvironmentVariable>
          <EnvironmentVariable
@@ -114,17 +114,17 @@
          </EnvironmentVariable>
          <EnvironmentVariable
             key = "JWTPrivateKey"
-            value = ""
+            value = "...="
             isEnabled = "YES">
          </EnvironmentVariable>
          <EnvironmentVariable
             key = "IAPPrivateKey"
-            value = ""
+            value = "-----BEGIN PRIVATE KEY-----\\nREPLACE_NEWLINES\\n-----END PRIVATE KEY-----"
             isEnabled = "YES">
          </EnvironmentVariable>
          <EnvironmentVariable
             key = "IAPIssuerId"
-            value = ""
+            value = "...-...-4...-..."
             isEnabled = "YES">
          </EnvironmentVariable>
          <EnvironmentVariable
@@ -134,6 +134,51 @@
          </EnvironmentVariable>
          <EnvironmentVariable
             key = "appAppleId"
+            value = ""
+            isEnabled = "YES">
+         </EnvironmentVariable>
+         <EnvironmentVariable
+            key = "PORT"
+            value = "8080"
+            isEnabled = "YES">
+         </EnvironmentVariable>
+         <EnvironmentVariable
+            key = "tokenExpiration"
+            value = "4"
+            isEnabled = "YES">
+         </EnvironmentVariable>
+         <EnvironmentVariable
+            key = "enableRateLimiter"
+            value = "0"
+            isEnabled = "YES">
+         </EnvironmentVariable>
+         <EnvironmentVariable
+            key = "userPermanentBlock"
+            value = ""
+            isEnabled = "YES">
+         </EnvironmentVariable>
+         <EnvironmentVariable
+            key = "userHourlyRateLimit"
+            value = ""
+            isEnabled = "YES">
+         </EnvironmentVariable>
+         <EnvironmentVariable
+            key = "userMinuteRateLimit"
+            value = ""
+            isEnabled = "YES">
+         </EnvironmentVariable>
+         <EnvironmentVariable
+            key = "anonPermanentBlock"
+            value = ""
+            isEnabled = "YES">
+         </EnvironmentVariable>
+         <EnvironmentVariable
+            key = "anonHourlyRateLimit"
+            value = ""
+            isEnabled = "YES">
+         </EnvironmentVariable>
+         <EnvironmentVariable
+            key = "anonMinuteRateLimit"
             value = ""
             isEnabled = "YES">
          </EnvironmentVariable>

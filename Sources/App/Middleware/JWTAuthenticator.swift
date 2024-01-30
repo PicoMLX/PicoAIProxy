@@ -87,7 +87,7 @@ struct JWTAuthenticator: HBAsyncAuthenticator {
 //            }
             return user
         } catch {
-            request.logger.debug("couldn't verify JWT token")
+            request.logger.error("couldn't verify JWT token \(jwtToken)")
             throw HBHTTPError(.unauthorized)
         }
     }
