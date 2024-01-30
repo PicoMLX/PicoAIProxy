@@ -13,12 +13,13 @@ struct UserMigration: AsyncMigration {
     func prepare(on database: FluentKit.Database) async throws {
         try await database.schema("user")
             .id()
-            .field("appAccountId", .uuid)
+            .field("appAccountToken", .uuid)
             .field("environment", .string, .required)
             .field("productId", .string, .required)
-            .field("status", .int32, .required)
-            .field("token", .string)
-            .unique(on: "appAccountId")
+            .field("subscriptionStatus", .int32, .required)
+            .field("blockedUntil", .date)
+            .field("jwtToken", .string)
+            .unique(on: "appAccountToken")
             .create()
     }
     

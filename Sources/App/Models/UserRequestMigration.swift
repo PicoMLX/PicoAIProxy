@@ -8,13 +8,15 @@
 import Foundation
 import FluentKit
 
-struct MessageMigration: AsyncMigration {
+struct UserRequestMigration: AsyncMigration {
     
     func prepare(on database: FluentKit.Database) async throws {
-        try await database.schema("message")
+        try await database.schema("userrequest")
             .id()
             .field("date", .datetime, .required)
+            .field("endpoint", .string)
             .field("model", .string)
+            .field("wasBlocked", .bool)
             .field("requestLen", .int)
             .field("responseLen", .int)
             .field("token", .string)

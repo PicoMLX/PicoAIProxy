@@ -73,14 +73,18 @@ struct JWTAuthenticator: HBAsyncAuthenticator {
         //    Fetch user from database
         do {
             let payload = try self.jwtSigners.verify(jwtToken, as: JWTPayloadData.self).subject.value
-            let appAccountId = UUID(uuidString: payload)
+            let appAccountToken = UUID(uuidString: payload)
             
             let user = try await User.query(on: request.db)
-                .filter(\.$appAccountId == appAccountId)
+                .filter(\.$appAccountToken == appAccountToken)
                 .first()
             guard let user = user else {
                 throw HBHTTPError(.notFound, message: "User not found")
             }
+//            if user.jwtToken != jwtToken {
+//                // invalid JWT token
+//                throw HBHTTPError(.unauthorized)
+//            }
             return user
         } catch {
             request.logger.debug("couldn't verify JWT token")

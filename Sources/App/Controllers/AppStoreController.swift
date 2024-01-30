@@ -40,7 +40,7 @@ struct AppStoreController {
         throw HBHTTPError(.internalServerError, message: "IAPPrivateKey, IAPIssuerId, IAPKeyId and/or appBundleId environment variables not set")
     }
 
-    /// Note: appAccountId can be nil. All users with an empty appAccountId
+    /// Note: appAccountToken can be nil. All users with an empty appAccountToken
     /// will be treated as a single user
     private func login(_ request: HBRequest) async throws -> [String: String] {
         
@@ -49,18 +49,25 @@ struct AppStoreController {
         
         // 2. If user is a new user, add user to database
         if try await User.query(on: request.db)
-            .filter(\.$appAccountId == user.appAccountId)
+            .filter(\.$appAccountToken == user.appAccountToken)
             .first()
              == nil {
             try await user.save(on: request.db)
+            request.logger.info("Saved user with app account token \(user.appAccountToken?.uuidString ?? "anon")")
         }
         
         let payload = JWTPayloadData(
-            subject: .init(value: user.appAccountId?.uuidString ?? "NO_ACCOUNT"),
+            subject: .init(value: user.appAccountToken?.uuidString ?? "NO_ACCOUNT"),
             expiration: .init(value: Date(timeIntervalSinceNow: 12 * 60 * 60)) // 12 hours
         )
-        return try [
-            "token": self.jwtSigners.sign(payload, kid: self.kid),
+        
+        let token = try self.jwtSigners.sign(payload, kid: self.kid)
+        
+        user.jwtToken = token
+        try await user.save(on: request.db)
+        
+        return [
+            "token": token,
         ]
     }
 }

@@ -1,5 +1,9 @@
 # SwiftOpenAIProxy
 
+### Introduction
+
+SwiftOpenAIProxy is a server-side Swift reverse proxy created for iOS and macOS GPT wrappers. SwiftOpenAIProxy secures your OpenAI API while only granting access to paying users. SwiftOpenAIProxy is written in server-side Swift so Swift developers can easily customize it.
+
 ### Background
 
 In December 2023, I faced a significant security breach when a group of hackers compromised my OpenAI key. They quickly used up my entire $2,500 monthly limit, resulting in an unexpected bill from OpenAI. This incident also forced me to take my app, Pico, offline, causing me to miss the crucial Christmas sales period, typically the year's most lucrative. For more details on this event, please visit:  https://youtu.be/_ueiYhLwwBc?si=8UC_7VZOrhgcXoKV
@@ -28,7 +32,7 @@ SwiftOpenAIProxy is designed to be compatible with any existing OpenAI library. 
 - [x] Reverse proxy server forwarding calls to OpenAI (or any other endpoint)
 - [x] Authenticates using App Store receipt validation
 - [ ] [App Attestation](https://developer.apple.com/documentation/devicecheck/preparing_to_use_the_app_attest_service) is on hold, as macOS doesn't support app attestation
-- [ ] Rate limiter
+- [x] Rate limiter
 - [ ] Account management and black list
 - [ ] Automatically translate and forward traffic to other AI APIs based on model setting in API call
 
@@ -84,23 +88,23 @@ When launched from Xcode, SwiftOpenAIProxy is accessible at http://localhost:808
 All traffic will be forwarded to `target`. The 'target' can be modified to direct traffic to any API, regardless of whether it conforms to the OpenAI API. , as long as your client application is compatible.
 The target is the site where all traffic is forwarded to. You can change the target to any API, even if the API doesn't conform OpenAI (so long as your client app does).
 
-### Environment variables
+## Environment variables
 
-#### OpenAI environment variables. 
+### OpenAI environment variables. 
 | Variable | Description | reference |
 | --- | --- | --- |
 | OpenAI-APIKey | OpenAI API key (sk-...) | https://platform.openai.com |
 | OpenAI-Organization | OpenAI org identifier (org-...) | https://platform.openai.com |
 | allowKeyPassthrough | if 1, requests with a valid OpenAI key and org in the header will be forwarded to OpenAI without modifications |
 
-#### App Store Connect environment variables
+### App Store Connect environment variables
 | Variable | Description | reference |
 | --- | --- | --- |
 | appTeamId | Apple Team ID | https://appstoreconnect.apple.com/ |
 | appBundleId | E.g. com.example.myapp | https://appstoreconnect.apple.com/ |
 | appAppleId | Apple Id under App Information -> General Information | https://appstoreconnect.apple.com/ |
 
-#### App Store Server API environment variables
+### App Store Server API environment variables
 | Variable | Description | reference |
 | --- | --- | --- |
 | IAPPrivateKey | IAP private key | https://appstoreconnect.apple.com/access/api/subs |
@@ -113,10 +117,42 @@ To ensure compatibility across different environments, SwiftOpenAIProxy requires
 
 A correctly formatted `IAPPrivateKey` for SwiftOpenAIProxy should appear as a single line: `-----BEGIN PRIVATE KEY-----\\n<LINE1>\\n<LINE2>\\n<LINE3>\\n<LINE4>\\n-----END PRIVATE KEY-----`, where `<LINE1>`, `<LINE2>`, `<LINE3>`, and `<LINE4>` represent the base64-encoded data of the key.
 
-#### JWT environment variables
+### JWT environment variables
 | Variable | Description | reference |
 | --- | --- | --- |
 | JWTPrivateKey |  | https://jwt.io/introduction |
+
+### Rate limiter environment variables
+| Variable | Default value | Description | 
+| --- | --- | --- |
+| enableRateLimiter | 0 | Set to 1 to activate the rate limiter |
+| userMinuteRateLimit | 15 | Max queries per minute per registered user
+| userHourlyRateLimit | 50 | Max queries per hour per registered user
+| userPermanentBlock | 50 | Blocked request threshold for permanent user ban
+| anonMinuteRateLimit | 60 | Combined max queries per minute for all anonymous users
+| anonHourlyRateLimit | 200 | Combined max queries per hour for all anonymous users
+| anonPermanentBlock | 50 | Blocked request threshold for banning all anonymous users 
+
+#### Guidelines and behavior
+
+By default, the rate limiter is off. To activate, set `enableRateLimiter` to 1.
+
+The rate limiter counts requests and doesn't distinguish between different models or AI providers. It's primarily a safeguard against abusive traffic.
+
+Users are identified by their app account tokens from the StoreKit 2 Transaction.purchase() call. Unidentified users are considered anonymous. For apps where all users are identified, consider removing the anonymous user limits (`anonHourlyRateLimit`, `anonMinuteRateLimit`, and `anonPermanentBlock`).
+
+#### Rate limits
+
+There are three rate levels that can be individually set or disabled:
+
+- A maximum number queries per hour (`userMinuteRateLimit` and `anonHourlyRateLimit`)
+- A maximum number of queries per minute (`userHourlyRateLimit` and `anonMinuteRateLimit`)
+- A maximum number of blocked messages (`userPermanentBlock` and `anonPermanentBlock`)
+ 
+If the 1 minute limit is reached, the user will be blocked for 5 minutes. If the hourly limit is reached, the user will be blocked for 60 minutes. If a user has exceeded the value set in `userPermanentBlock` or `anonPermanentBlock` they will be banned permanently. These values are hardcoded in SwiftOpenAIProxy.
+
+Note 
+SwiftOpenAIProxy currently does not persist data. Upon server restart, any permanently blocked users will be unblocked.
 
 ## How to call SwiftOpenAIProxy from your iOS or macOS app
 
@@ -181,6 +217,8 @@ Optionally: Track users using [app account token](https://developer.apple.com/do
 SwiftOpenAIProxyServer will automatically extract the app account token from the receipts.
 
 ## How to deploy
+
+Use link below to deploy SwiftOpenAIProxy on Railway. The link includes a referral code.
 
 [![Deploy on Railway](https://railway.app/button.svg)](https://railway.app/template/ocPcV2?referralCode=WKPLp3)
 

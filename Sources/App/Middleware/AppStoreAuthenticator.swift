@@ -1,6 +1,6 @@
 //
-//  File.swift
-//  
+//  AppStoreAuthenticator.swift
+//
 //
 //  Created by Ronald Mannak on 1/21/24.
 //
@@ -14,16 +14,22 @@ import AppStoreServerLibrary
 import FoundationNetworking
 #endif
 
+/// Defines a custom authenticator for App Store transactions
 struct AppStoreAuthenticator: HBAsyncAuthenticator {
-    
+   
+    // Properties to hold App Store credentials and app-specific information
     let iapKey: String
     let iapIssuerId: String
     let iapKeyId: String
     let bundleId: String
     let appAppleId: Int64
     
+    /// Initializer to load necessary credentials and configuration from environment variables
     init() throws {
-        // Fetch IAP private key, issuer ID and Key ID
+        
+        // Fetch IAP private key, issuer ID, and Key ID from environment variables
+        // Information about creating a private key is available in Apple's documentation
+        // Failing to find required environment variables results in an error
         // To create a private key, see:
         //    https://developer.apple.com/documentation/appstoreserverapi/creating_api_keys_to_use_with_the_app_store_server_api
         //    and https://developer.apple.com/wwdc23/10143
@@ -47,6 +53,9 @@ struct AppStoreAuthenticator: HBAsyncAuthenticator {
         self.appAppleId = appAppleId
     }
     
+    /// Authenticates incoming requests based on App Store receipt or transaction ID
+    /// - Parameter request: HBRequest
+    /// - Returns: User model if app store receipt is valid
     func authenticate(request: HBRequest) async throws -> User? {
         
         // 1. The server expects an app store receipt
@@ -57,8 +66,9 @@ struct AppStoreAuthenticator: HBAsyncAuthenticator {
             request.logger.error("/appstore invoked without app store receipt or transaction id in body")
             throw HBHTTPError(.badRequest)
         }
-        
-        // 2. Extract transactionId from receipt
+            
+        // 2. Attempts to extract the transactionId from the receipt
+        //    If unsuccessful, assumes the body itself is a transaction ID (useful for sandbox testing)
         let transactionId: String
         if let transaction = ReceiptUtility.extractTransactionId(transactionReceipt: body) {
             transactionId = transaction
@@ -67,9 +77,9 @@ struct AppStoreAuthenticator: HBAsyncAuthenticator {
             // (when the client app is a local Xcode build)
             transactionId = body
         }
-                
-        // 3. Validate the transaction Id in production first.
-        //    If that fails, try sandbox
+
+        // 3. Tries to validate the transaction in production environment first
+        //    If not found (404 error), retries in the sandbox environment
         do {
             return try await validate(request, transactionId: transactionId, environment: .production)
         } catch let error as HBHTTPError where error.status == .notFound {
@@ -77,6 +87,14 @@ struct AppStoreAuthenticator: HBAsyncAuthenticator {
         }
     }
     
+    
+    /// Validates the transaction ID with the App Store and returns a User if successful
+
+    /// - Parameters:
+    ///   - request: <#request description#>
+    ///   - transactionId: <#transactionId description#>
+    ///   - environment: <#environment description#>
+    /// - Returns: <#description#>
     private func validate(_ request: HBRequest, transactionId: String, environment: Environment) async throws -> User? {
         
         // 1. Create App Store API client
@@ -87,7 +105,8 @@ struct AppStoreAuthenticator: HBAsyncAuthenticator {
         let verifier = try SignedDataVerifier(rootCertificates: rootCertificates, bundleId: bundleId, appAppleId: appAppleId, environment: environment, enableOnlineChecks: true)
         
         // 3. Set up variables needed to create user
-        let user = User(appAccountId: nil, environment: environment.rawValue, productId: "", status: .expired)
+        var user = User(appAccountToken: nil, environment: environment.rawValue, productId: "", status: .expired)
+        try await user.save(on: request.db)
         var signedTransactionInfo: String?
         var signedRenewalInfo: String?
         
@@ -102,12 +121,12 @@ struct AppStoreAuthenticator: HBAsyncAuthenticator {
                 item.lastTransactions?.forEach { transaction in
                     // We're only saving one subscription, an active one if available.
                     // Update user.status. Make sure we don't overwrite it if the status is already .active
-                    if user.status != Status.active.rawValue, let status = transaction.status {
-                        user.status = status.rawValue
+                    if user.subscriptionStatus != Status.active.rawValue, let status = transaction.status {
+                        user.subscriptionStatus = status.rawValue
                     }
                     // Assuming the transactions are in ascending order, we're storing the most recent
-                    // infos. This should fetch the appAccountId even if previous transactions didn't ahve
-                    // an appAccountId set
+                    // infos. This should fetch the appAccountToken even if previous transactions didn't ahve
+                    // an appAccountToken set
                     signedTransactionInfo = transaction.signedTransactionInfo
                     signedRenewalInfo = transaction.signedRenewalInfo
                 }
@@ -115,6 +134,7 @@ struct AppStoreAuthenticator: HBAsyncAuthenticator {
         case .failure(let statusCode, let rawApiError, let apiError, let errorMessage, let causedBy):
             if statusCode == 404 && environment == .production {
                 // No transaction wasn't found. Try sandbox
+                request.logger.error("TransactionID not found in \(environment.rawValue). Error: \(statusCode ?? -1): \(errorMessage ?? "Unknown error"), \(String(describing: rawApiError)) \(String(describing: apiError)), \(String(describing: causedBy))")
                 throw HBHTTPError(.notFound)
             } else {
                 // Other error occured
@@ -132,10 +152,12 @@ struct AppStoreAuthenticator: HBAsyncAuthenticator {
                 // Fetches app account token set by client app.
                 // Note: Token is nil when client app doesn't set appAccountToken during the purchase
                 // See https://developer.apple.com/documentation/storekit/product/3791971-purchase
-                user.appAccountId = payload.appAccountToken
+                user.appAccountToken = payload.appAccountToken
                 if let productId = payload.productId {
                     user.productId = productId
+                    try await user.save(on: request.db)
                 }
+                try await user.save(on: request.db)
             case .invalid(let error):
                 request.logger.error("Verifying transaction failed. Error: \(error)")
                 throw HBHTTPError(.unauthorized)
