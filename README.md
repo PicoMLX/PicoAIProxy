@@ -2,7 +2,7 @@
 
 ### Introduction
 
-SwiftOpenAIProxy is a server-side Swift reverse proxy created for iOS and macOS GPT wrappers. SwiftOpenAIProxy secures your OpenAI API while only granting access to paying users. SwiftOpenAIProxy is written in server-side Swift so Swift developers can easily customize it.
+SwiftOpenAIProxy is a server-side Swift reverse proxy. It's built for iOS and macOS GPT wrappers. The tool protects your OpenAI API, limiting access to paid users only. Written in server-side Swift, it allows easy customization for Swift developers.
 
 ### Background
 
