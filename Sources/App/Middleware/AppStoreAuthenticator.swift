@@ -64,7 +64,7 @@ struct AppStoreAuthenticator: HBAsyncAuthenticator {
         //    (in the iOS and macOS client app: Bundle.main.appStoreReceiptURL)
         //    However, the receipt is not available when testing in Xcode Sandbox,
         //    so the server accepts a transaction Id in sandbox mode as well
-        let request = try await request.collateBody().get()        
+        let request = try await request.collateBody().get()
         guard let buffer = request.body.buffer, let body = buffer.getString(at: buffer.readerIndex, length: buffer.readableBytes) else {
             request.logger.error("/appstore invoked without app store receipt or transaction id in body")
             throw HBHTTPError(.badRequest)
@@ -119,7 +119,16 @@ struct AppStoreAuthenticator: HBAsyncAuthenticator {
                 
                 guard let signedTransactionInfo = transaction.signedTransactionInfo else { continue }
                 
-                let (appAccountToken, productId) = try await fetchUserAppAccountToken(signedTransactionInfo: signedTransactionInfo, environment: environment, request: request)
+                let appAccountToken: UUID?
+                let productId: String?
+                do {
+                    let (token, product) = try await fetchUserAppAccountToken(signedTransactionInfo: signedTransactionInfo, environment: environment, request: request)
+                    appAccountToken = token
+                    productId = product
+                } catch {
+                    // Skip to next product in case of an error
+                    continue
+                }
 
                 if let productId {
                     user.productId = productId

@@ -51,7 +51,7 @@ struct RateLimiterMiddleware: HBAsyncMiddleware {
             
             let userRequest = try? UserRequest(endpoint: request.uri.path, wasBlocked: false, userId: user.requireID())
             try? await userRequest?.save(on: request.db)
-            request.logger.info("User \(user.appAccountToken?.uuidString ?? "anon") request \(request.uri.path). Rate enabler is disabled")
+            request.logger.info("User \(user.appAccountToken?.uuidString ?? "anon") request \(request.uri.path). Rate limiter is disabled")
             return try await next.respond(to: request)
             
         }
