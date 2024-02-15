@@ -72,8 +72,7 @@ struct AppStoreAuthenticator: HBAsyncAuthenticator {
             
         // 2. Attempts to extract the transactionId from the receipt
         //    If unsuccessful, assumes the body itself is a transaction ID (useful for sandbox testing)
-//        guard let transactionId = ReceiptUtility.extractTransactionId(appReceipt: body) else {
-        guard let transactionId = ReceiptUtility.extractTransactionId(transactionReceipt: body) else {
+        guard let transactionId = ReceiptUtility.extractTransactionId(appReceipt: body) else {
             // Body can't be parsed because body isn't the app receipt
             // Retry in sandbox mode
             request.logger.error("Body is not an app receipt. Trying to validate in sandbox. Body: (\(body)")
