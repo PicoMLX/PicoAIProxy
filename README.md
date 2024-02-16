@@ -14,7 +14,7 @@ SwiftOpenAIProxy is designed to be compatible with any existing OpenAI library. 
 
 ### Key features
 
-- SwiftOpenAIProxy operates without user accounts. Instead, it verifies the App Store subscription receipt from the iOS or macOS client app.
+- SwiftOpenAIProxy operates without user accounts. Instead, it verifies ~~App Store subscription receipts~~ **transaction IDs** from the iOS or macOS client app. (See issue https://github.com/apple/app-store-server-library-swift/issues/33)
 - SwiftOpenAIProxy uses Apple's [App Store Server Library](https://github.com/apple/app-store-server-library-swift) for receipt validation
 - Once the receipt is validated, SwiftOpenAIProxy issues a JWT token the client can use for subsequent calls
 - SwiftOpenAIProxy is API agnostic and forwards any request to https://api.openai.com.
@@ -32,8 +32,8 @@ SwiftOpenAIProxy is designed to be compatible with any existing OpenAI library. 
 - [x] Reverse proxy server forwarding calls to OpenAI (or any other endpoint)
 - [x] Authenticates using App Store receipt validation
 - [ ] [App Attestation](https://developer.apple.com/documentation/devicecheck/preparing_to_use_the_app_attest_service) is on hold, as macOS doesn't support app attestation
-- [x] Rate limiter
-- [ ] Account management and black list
+- [x] Rate limiter and black list
+- [ ] Account management
 - [ ] Automatically translate and forward traffic to other AI APIs based on model setting in API call
 
 ## Requirements
@@ -179,6 +179,7 @@ Using [CleverBird](http://github.com/btfranklin/CleverBird/issues)
     func fetchToken() async throws -> Token {
         let body: String?
 
+        /*
         // Fetch app store receipt
         if let appStoreReceiptURL = Bundle.main.appStoreReceiptURL,
            FileManager.default.fileExists(atPath: appStoreReceiptURL.path),
@@ -189,6 +190,10 @@ Using [CleverBird](http://github.com/btfranklin/CleverBird/issues)
             // the receipt Id.
             body = "transaction Id here"
         }
+        */
+        
+        // Validating receipts is temporary disabled 
+        body = "transaction Id here"
         
         let tokenRequest = Request<Token>(
             path: "appstore",

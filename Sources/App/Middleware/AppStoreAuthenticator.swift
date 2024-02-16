@@ -69,15 +69,26 @@ struct AppStoreAuthenticator: HBAsyncAuthenticator {
             request.logger.error("/appstore invoked without app store receipt or transaction id in body")
             throw HBHTTPError(.badRequest)
         }
+        
+        request.logger.info("parsing body: \(body.count)")
             
+        /*
+         There is an issue with extracting transaction Ids from iOS certificates, see
+         https://github.com/apple/app-store-server-library-swift/issues/33
+         SwiftOpenAIProxy will only accept transactionIds for now.
+         */
+        
         // 2. Attempts to extract the transactionId from the receipt
         //    If unsuccessful, assumes the body itself is a transaction ID (useful for sandbox testing)
+        /*
         guard let transactionId = ReceiptUtility.extractTransactionId(appReceipt: body) else {
             // Body can't be parsed because body isn't the app receipt
             // Retry in sandbox mode
             request.logger.error("Body is not an app receipt. Trying to validate in sandbox. Body: (\(body)")
             return try await validate(request, transactionId: body, environment: .sandbox)
         }
+        */
+        let transactionId = body
         
         request.logger.info("Found transaction ID \(transactionId)")
 
