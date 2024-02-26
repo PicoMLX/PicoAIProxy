@@ -71,24 +71,16 @@ struct JWTAuthenticator: HBAsyncAuthenticator {
 
         // 3. Verify token is a valid token created by SwiftOpenAIProxy
         //    Fetch user from database
-        do {
-            let payload = try self.jwtSigners.verify(jwtToken, as: JWTPayloadData.self).subject.value
-            let appAccountToken = UUID(uuidString: payload)
-            
-            let user = try await User.query(on: request.db)
-                .filter(\.$appAccountToken == appAccountToken)
-                .first()
-            guard let user = user else {
-                throw HBHTTPError(.notFound, message: "User not found")
-            }
-//            if user.jwtToken != jwtToken {
-//                // invalid JWT token
-//                throw HBHTTPError(.unauthorized)
-//            }
-            return user
-        } catch {
-            request.logger.error("couldn't verify JWT token \(jwtToken)")
+        let payload = try self.jwtSigners.verify(jwtToken, as: JWTPayloadData.self).subject.value
+        let appAccountToken = UUID(uuidString: payload)
+        
+        let user = try await User.query(on: request.db)
+            .filter(\.$appAccountToken == appAccountToken)
+            .first()
+        guard let user = user else {
+            request.logger.error("User \(appAccountToken?.uuidString ?? "unkown") not found in database. Token: \(jwtToken)")
             throw HBHTTPError(.unauthorized)
         }
+        return user
     }
 }
