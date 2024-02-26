@@ -78,7 +78,7 @@ struct JWTAuthenticator: HBAsyncAuthenticator {
             .filter(\.$appAccountToken == appAccountToken)
             .first()
         guard let user = user else {
-            request.logger.error("User \(appAccountToken?.uuidString ?? "unkown") not found in database. Token: \(jwtToken)")
+            request.logger.error("User \(appAccountToken?.uuidString ?? "unknown") not found in database. Token: \(jwtToken)")
             throw HBHTTPError(.unauthorized)
         }
         return user
