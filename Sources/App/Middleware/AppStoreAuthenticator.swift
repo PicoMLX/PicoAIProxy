@@ -103,7 +103,9 @@ struct AppStoreAuthenticator: HBAsyncAuthenticator {
     private func validate(_ request: HBRequest, transactionId: String, environment: Environment) async throws -> User? {
         
         // 1. Create App Store API client
-        let appStoreClient = try AppStoreServerAPIClient(signingKey: iapKey, keyId: iapKeyId, issuerId: iapIssuerId, bundleId: bundleId, environment: .production)
+        let appStoreClient = try AppStoreServerAPIClient(signingKey: iapKey, keyId: iapKeyId, issuerId: iapIssuerId, bundleId: bundleId, environment: environment)
+        
+        request.logger.info("Created API Client for keyId: \(iapKeyId), issuer: \(iapIssuerId), bundleId: \(bundleId), env: \(environment.rawValue)")
         
         // 3. create user
         let user = User(appAccountToken: nil, environment: environment.rawValue, productId: "", status: .expired)
