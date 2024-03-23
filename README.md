@@ -170,9 +170,12 @@ Using [CleverBird](http://github.com/btfranklin/CleverBird/issues)
             .addUserMessage(content: "Who won the world series in 2020?")
         do {
             let completion = try await chatThread.complete(using: openAIAPIConnection)
-        } catch CleverBirdError.unauthorized {
+        } catch CleverBird.proxyAuthenticationRequired {
+            // Client needs to re-authenticate
             token = try await fetchToken()
-            try await completion(prompt: String)            
+            try await completion(prompt: String)
+        } catch CleverBirdError.unauthorized {
+            // Prompt user to buy a subscription          
         }      
     }
     
@@ -220,6 +223,8 @@ Optionally: Track users using [app account token](https://developer.apple.com/do
 ```
 
 SwiftOpenAIProxyServer will automatically extract the app account token from the receipts.
+
+The SwiftOpenAIProxyServer may generate two distinct error codes related to authorization issues: unauthorized (401) and proxyAuthenticationRequired (407). The unauthorized error indicates a lack of a valid App Store subscription on the user's part. On the other hand, the proxyAuthenticationRequired error signifies that the client's authentication token is no longer valid, a situation that may arise following a server reboot. In the latter case, reauthorization can be achieved through a straightforward re-authentication process that does not require user intervention. 
 
 ## How to deploy
 

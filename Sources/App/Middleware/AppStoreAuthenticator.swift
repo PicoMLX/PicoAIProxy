@@ -115,7 +115,7 @@ struct AppStoreAuthenticator: HBAsyncAuthenticator {
         switch allSubs {
         case .success(let response):
             
-            request.logger.info("TxId: \(transactionId) \(environment.rawValue): Successfully received response from getAllSubscriptionStatuses. Response: \(response)")
+//            request.logger.info("TxId: \(transactionId) \(environment.rawValue): Successfully received response from getAllSubscriptionStatuses. Response: \(response)")
             request.logger.info("TxId: \(transactionId) \(environment.rawValue): number of data: \(response.data?.count ?? 0)")
             
             // SwiftProxyServer assumes app has a single subscription group
@@ -125,10 +125,12 @@ struct AppStoreAuthenticator: HBAsyncAuthenticator {
                 throw HBHTTPError(.unauthorized, message: "No active or grace period subscription status found")
             }
             
-            request.logger.info("TxId: \(transactionId) \(environment.rawValue): Found \(lastTransactions.count) transactions in environment \(environment.rawValue) for \(transactionId)")
+            request.logger.info("TxId: \(transactionId) \(environment.rawValue): Found \(lastTransactions.count) transactions")
             
             // Loop through the transactions in the subscription group
             for transaction in lastTransactions {
+                
+                request.logger.info("Parsing transaction \(transaction.originalTransactionId ?? "(No original tx id)"), status: \(transaction.status?.description ?? "(no known status)")")
                 
                 guard let signedTransactionInfo = transaction.signedTransactionInfo else { continue }
                 
