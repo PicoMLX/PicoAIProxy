@@ -47,6 +47,8 @@ struct AppStoreController {
         // 1. Fetch user from AppStoreAuthenticator middleware
         let user = try request.authRequire(User.self)
         
+        request.logger.info("Starting login for user \(user.appAccountToken?.uuidString ?? "anon")")
+        
         // 2. If user is a new user, add user to database
         if try await User.query(on: request.db)
             .filter(\.$appAccountToken == user.appAccountToken)
