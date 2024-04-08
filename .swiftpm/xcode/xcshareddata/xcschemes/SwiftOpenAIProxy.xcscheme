@@ -77,7 +77,7 @@
       </BuildableProductRunnable>
       <CommandLineArguments>
          <CommandLineArgument
-            argument = "--port 8034"
+            argument = "--port 8080"
             isEnabled = "YES">
          </CommandLineArgument>
       </CommandLineArguments>
@@ -89,7 +89,7 @@
          </EnvironmentVariable>
          <EnvironmentVariable
             key = "OpenAI-Organization"
-            value = "org..."
+            value = "org-..."
             isEnabled = "YES">
          </EnvironmentVariable>
          <EnvironmentVariable
@@ -114,7 +114,7 @@
          </EnvironmentVariable>
          <EnvironmentVariable
             key = "JWTPrivateKey"
-            value = "...="
+            value = ""
             isEnabled = "YES">
          </EnvironmentVariable>
          <EnvironmentVariable
@@ -138,48 +138,38 @@
             isEnabled = "YES">
          </EnvironmentVariable>
          <EnvironmentVariable
-            key = "PORT"
-            value = "8080"
-            isEnabled = "YES">
-         </EnvironmentVariable>
-         <EnvironmentVariable
-            key = "tokenExpiration"
-            value = "4"
-            isEnabled = "YES">
-         </EnvironmentVariable>
-         <EnvironmentVariable
             key = "enableRateLimiter"
             value = "0"
             isEnabled = "YES">
          </EnvironmentVariable>
          <EnvironmentVariable
-            key = "userPermanentBlock"
-            value = ""
+            key = "userMinuteRateLimit"
+            value = "15"
             isEnabled = "YES">
          </EnvironmentVariable>
          <EnvironmentVariable
             key = "userHourlyRateLimit"
-            value = ""
+            value = "50"
             isEnabled = "YES">
          </EnvironmentVariable>
          <EnvironmentVariable
-            key = "userMinuteRateLimit"
-            value = ""
-            isEnabled = "YES">
-         </EnvironmentVariable>
-         <EnvironmentVariable
-            key = "anonPermanentBlock"
-            value = ""
-            isEnabled = "YES">
-         </EnvironmentVariable>
-         <EnvironmentVariable
-            key = "anonHourlyRateLimit"
-            value = ""
+            key = "userPermanentBlock"
+            value = "50"
             isEnabled = "YES">
          </EnvironmentVariable>
          <EnvironmentVariable
             key = "anonMinuteRateLimit"
-            value = ""
+            value = "60"
+            isEnabled = "YES">
+         </EnvironmentVariable>
+         <EnvironmentVariable
+            key = "anonHourlyRateLimit"
+            value = "200"
+            isEnabled = "YES">
+         </EnvironmentVariable>
+         <EnvironmentVariable
+            key = "anonPermanentBlock"
+            value = "50"
             isEnabled = "YES">
          </EnvironmentVariable>
       </EnvironmentVariables>
