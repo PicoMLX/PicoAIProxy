@@ -30,14 +30,22 @@ public struct HBProxyServerMiddleware: HBMiddleware {
     }
 
     let httpClient: HTTPClient
-    let proxy: Proxy
+//    let proxy: Proxy
 
-    public init(httpClient: HTTPClient, proxy: Proxy) {
+    public init(httpClient: HTTPClient) { //, proxy: Proxy) {
         self.httpClient = httpClient
-        self.proxy = proxy
+//        self.proxy = proxy
     }
 
     public func apply(to request: HBRequest, next: HBResponder) -> EventLoopFuture<HBResponse> {
+        
+        let proxy: Proxy
+        if let modelName = request.headers.first(name: "model"), let model = LLMModel.fetch(model: modelName) {
+            proxy = model.proxy()
+        } else {
+            proxy = Proxy(location: "", target: "https://api.openai.com")
+        }
+        
         guard let responseFuture = forward(request: request, to: proxy) else {
             return next.respond(to: request)
         }
@@ -48,6 +56,8 @@ public struct HBProxyServerMiddleware: HBMiddleware {
         guard request.uri.description.hasPrefix(proxy.location) else { return nil }
         let newURI = request.uri.description.dropFirst(proxy.location.count)
         guard newURI.first == nil || newURI.first == "/" else { return nil }
+        
+        request.logger.info("Forwarding request to \(newURI)")
 
         do {
             // create request

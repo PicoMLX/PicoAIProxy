@@ -68,13 +68,13 @@ extension HBApplication {
         self.middleware.add(MessageRouterMiddleware())
         
         // 10. Add OpenAI API key middleware. This middleware will add the OpenAI org and API key in the header of the request
-        self.middleware.add(OpenAIKeyMiddleware())
+        self.middleware.add(APIKeyMiddleware())
         
         // 11. Add Proxy middleware. If you don't need any authentication, you can remove steps 3 through 6 above
         self.middleware.add(
             HBProxyServerMiddleware(
-                httpClient: httpClient,
-                proxy: .init(location: args.location, target: args.target)
+                httpClient: httpClient //,
+//                proxy: .init(location: args.location, target: args.target) // Note: This is ignored
             )
         )
     }

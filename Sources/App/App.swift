@@ -18,10 +18,10 @@ struct HummingbirdArguments: AsyncParsableCommand, AppArguments {
         var port: Int = 8080
     
     @Option(name: .shortAndLong)
-    var location: String = ""
+    var location: String = "" // Note: this is ignored
 
     @Option(name: .shortAndLong)
-    var target: String = "https://api.openai.com"
+    var target: String = ""  // Note: this is ignored
 
     func run() async throws {
         

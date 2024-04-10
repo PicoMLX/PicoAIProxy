@@ -21,16 +21,18 @@ struct MessageRouterMiddleware: HBAsyncMiddleware {
             throw HBHTTPError(.badRequest)
         }
 
-        // 2. Decode body
-        let decoder = JSONDecoder()
-        if let chat = try? decoder.decode(Chat.self, from: data) {
-            request.logger.info("Decoded chat: \(chat.model)")
-        } else {
-            // just forward message
-            request.logger.info("MessageRouterMiddleware: Could not decode chat")
+        // 2. Find model in body. Default to OpenAI if body isn't a chat (but e.g. an embedding)
+        var headers = request.headers
+        if let model = LLMModel.fetchModel(from: data) {
+            request.logger.info("Rerouting \(model.name) to \(model.provider.name)")
+            headers.replaceOrAdd(name: "model", value: model.name)
         }
-    
-        return try await next.respond(to: request)
+        
+        // 3. Update header
+        let head = HTTPRequestHead(version: request.version, method: request.method, uri: request.uri.string, headers: headers)
+        let convertedRequest = HBRequest(head: head, body: request.body, application: request.application, context: request.context)
+        
+        return try await next.respond(to: convertedRequest)
     }
 }
 
