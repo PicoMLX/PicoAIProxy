@@ -25,6 +25,9 @@ struct HummingbirdArguments: AsyncParsableCommand, AppArguments {
 
     func run() async throws {
         
+        // Load models and providers
+        LLMModel.load()
+        
         // Use Railway.app's port
         let port = Int(HBEnvironment().get("PORT") ?? "8080") ?? 8080
         let app = HBApplication(
