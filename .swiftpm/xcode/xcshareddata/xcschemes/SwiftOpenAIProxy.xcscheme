@@ -124,7 +124,7 @@
          </EnvironmentVariable>
          <EnvironmentVariable
             key = "IAPIssuerId"
-            value = "...-...-4...-..."
+            value = "...-...-4...-...-..."
             isEnabled = "YES">
          </EnvironmentVariable>
          <EnvironmentVariable
@@ -170,6 +170,11 @@
          <EnvironmentVariable
             key = "anonPermanentBlock"
             value = "50"
+            isEnabled = "YES">
+         </EnvironmentVariable>
+         <EnvironmentVariable
+            key = "Anthropic-APIKey"
+            value = "sk-ant-api03-..."
             isEnabled = "YES">
          </EnvironmentVariable>
       </EnvironmentVariables>
