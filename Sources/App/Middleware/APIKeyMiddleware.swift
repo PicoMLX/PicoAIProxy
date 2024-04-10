@@ -13,6 +13,9 @@ struct APIKeyMiddleware: HBMiddleware {
         
         var headers = request.headers
         
+        // Make sure not to send user's Pico Proxy auth token to provider
+        headers.remove(name: "Authorization")
+        
         do {
             if let modelName = headers.first(name: "model"), let model = LLMModel.fetch(model: modelName) {
                 try model.provider.setHeaders(headers: &headers)

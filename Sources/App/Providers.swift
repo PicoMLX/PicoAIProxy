@@ -43,10 +43,10 @@ extension LLMModel {
     
     static func load() {
         for model in gptModels {
-            models.append(LLMModel(name: model, endpoint: "/v1/chat/completions", provider: LLMProvider.openAI))
+            models.append(LLMModel(name: model, endpoint: "", provider: LLMProvider.openAI)) // leaving endpoint empty so all calls will be forwarded to original path /v1/chat/completions
         }
         for model in claudeModels {
-            models.append(LLMModel(name: model, endpoint: "/v1/chat/completions", provider: LLMProvider.anthropic))
+            models.append(LLMModel(name: model, endpoint: "/v1/messages", provider: LLMProvider.anthropic))
         }
     }
 }
