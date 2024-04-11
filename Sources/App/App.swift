@@ -22,6 +22,15 @@ struct HummingbirdArguments: AsyncParsableCommand, AppArguments {
 
     @Option(name: .shortAndLong)
     var target: String = ""  // Note: this is ignored
+        
+    func run() async throws {
+        
+        // Load models and providers
+        LLMModel.load()
+        
+        let app = buildApplication(self)
+        try await app.runService()
+    }
 
     func run() async throws {
         
