@@ -30,11 +30,9 @@ public struct HBProxyServerMiddleware: HBMiddleware {
     }
 
     let httpClient: HTTPClient
-//    let proxy: Proxy
 
-    public init(httpClient: HTTPClient) { //, proxy: Proxy) {
+    public init(httpClient: HTTPClient) {
         self.httpClient = httpClient
-//        self.proxy = proxy
     }
 
     public func apply(to request: HBRequest, next: HBResponder) -> EventLoopFuture<HBResponse> {

@@ -22,7 +22,7 @@ struct MessageRouterMiddleware: HBAsyncMiddleware {
             request.logger.error("Unable to decode body in MessageRouterMiddleware")
             throw HBHTTPError(.badRequest)
         }
-
+        
         // 2. Find model in body. Default to OpenAI if body isn't a chat (but e.g. an embedding)
         var headers = request.headers
         var uri = request.uri.string
@@ -38,7 +38,20 @@ struct MessageRouterMiddleware: HBAsyncMiddleware {
         let head = HTTPRequestHead(version: request.version, method: request.method, uri: uri, headers: headers)
         let convertedRequest = HBRequest(head: head, body: request.body, application: request.application, context: request.context)
         
-        return try await next.respond(to: convertedRequest)
+        let response = try await next.respond(to: convertedRequest)
+//        print("---")
+//        switch response.body {
+//        case .stream(let streamer):
+//            let output = streamer.read(on: request.eventLoop)
+//            output.whenSuccess { output in
+//                print(output)
+//            }
+//        default:
+//            break
+//        }
+//        print("---")
+        return response
+//        return try await next.respond(to: convertedRequest)
     }
 }
 

@@ -78,7 +78,8 @@ To set up Pico AI Proxy, you need:
 - Apple root certificates, which are included in the repository but should be updated if Apple updates their certificates
 
 #### OpenAI API key and organization
-Generate an OpenAI API key at https://platform.openai.com
+Generate an OpenAI API key at [OpenAI](https://platform.openai.com)
+Optionally generate an Anthropic Claude API key at [Anthropic](https://docs.anthropic.com/claude/reference/getting-started-with-the-api) 
 
 #### JWT Private key
 Create a new JWT private key in macOS Terminal using `openssl rand -base64 32`
@@ -263,10 +264,15 @@ Use link below to deploy Pico AI Proxy on Railway. The link includes a referral 
 
 Alternatively, Pico AI Proxy can be installed manually on any other hosting provider.
 
+
+## Support
+
+- [Pico Discord](https://discord.gg/Nrf5y8Uaxw)
+- [Twitter](https://twitter.com/picoGPT)
+
 ## Apps using Pico AI Proxy
 
-- Pico
-
+- [Pico](https://apps.apple.com/us/app/pico-professional-ai-assistant/id1668205047)
 
 ## Contributors
 <a href="https://github.com/ronaldmannak/SwiftOpenAIProxy/graphs/contributors">
