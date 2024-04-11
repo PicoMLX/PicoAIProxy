@@ -33,7 +33,7 @@ struct HummingbirdArguments: AsyncParsableCommand, AppArguments {
         let app = HBApplication(
             configuration: .init(
                 address: .hostname(self.hostname, port: port),
-                serverName: "SwiftOpenAIProxyServer"
+                serverName: "PicoAIProxy"
             )
         )
         try await app.configure(self)

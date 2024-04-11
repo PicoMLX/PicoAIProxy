@@ -34,8 +34,8 @@ import Hummingbird
 /// To disable any or multiple rules, remove the environment variable or its value (i.e. `userPermanentBlock`, `userHourlyRateLimit`, `userMinuteRateLimit`,
 /// `anonPermanentBlock`, `anonHourlyRateLimit`, and `anonMinuteRateLimit`)
 ///
-/// Note that the current version of SwiftOpenAIProxy doesn't store data persistently. Blocks and message request history will be reset
-/// whenever SwiftOpenAIProxy is deployed.
+/// Note that the current version of Pico AI Proxy doesn't store data persistently. Blocks and message request history will be reset
+/// whenever Pico AI Proxy is deployed.
 ///
 /// For more precise control, such as downgrading the model from GPT-4 to GPT-3.5 when a user exceeds a specific limit,
 /// you need to handle this logic on the client side

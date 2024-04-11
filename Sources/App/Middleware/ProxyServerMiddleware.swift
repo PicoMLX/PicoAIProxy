@@ -57,8 +57,6 @@ public struct HBProxyServerMiddleware: HBMiddleware {
         let newURI = request.uri.description //.dropFirst(proxy.location.count) // TODO: not sure if this boilerplate code did anything we want it to do. Refactor after HummingBird 2.0
         guard newURI.first == nil || newURI.first == "/" else { return nil }
         
-        request.logger.info("Forwarding request to \(newURI)")
-        
         do {
             // create request
             let ahcRequest = try request.ahcRequest(uri: String(newURI), host: proxy.target, eventLoop: request.eventLoop)

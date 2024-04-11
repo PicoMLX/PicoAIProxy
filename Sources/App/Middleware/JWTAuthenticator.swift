@@ -71,7 +71,7 @@ struct JWTAuthenticator: HBAsyncAuthenticator {
             return nil
         }
 
-        // 3. Verify token is a valid token created by SwiftOpenAIProxy
+        // 3. Verify token is a valid token created by Pico AI Proxy
         let payload: String
         let appAccountToken: UUID?
         do {
