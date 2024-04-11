@@ -11,7 +11,7 @@ import Hummingbird
 import HummingbirdAuth
 import AppStoreServerLibrary
 
-final class User: Model, HBAuthenticatable {
+final class User: Model, Authenticatable {
     
     static let schema = "user"
     

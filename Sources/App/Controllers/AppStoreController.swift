@@ -7,16 +7,18 @@
 
 import Foundation
 import Hummingbird
+import HummingbirdAuth
 import JWTKit
 import FluentKit
 
-struct AppStoreController {
+struct AppStoreController<Context: AuthRequestContext> {
     
     let jwtSigners: JWTSigners
     let kid: JWKIdentifier
 
+    
     /// Add routes for /appstore
-    func addRoutes(to group: HBRouterGroup) {
+    func addRoutes(to group: RouterGroup<Context>) {
         
         // Set app store authenticator that returns valid User instance
         // If the setup fails because the environment variables aren't set,
@@ -35,7 +37,7 @@ struct AppStoreController {
             .post("/", use: login)
     }
     
-    private func incorrectSetup(_ request: HBRequest) async throws -> String {
+    @Sendable private func incorrectSetup(_ request: Request, context: Context) async throws -> EditedResponse<UserResponse> {
         request.logger.error("Missing environment variable(s): IAPPrivateKey, IAPIssuerId, IAPKeyId, appBundleId and/or appAppleId")
         throw HBHTTPError(.internalServerError, message: "IAPPrivateKey, IAPIssuerId, IAPKeyId and/or appBundleId environment variables not set")
     }
