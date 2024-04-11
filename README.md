@@ -269,6 +269,6 @@ Alternatively, Pico AI Proxy can be installed manually on any other hosting prov
 
 
 ## Contributors
-<a href="https://github.com/OWNER/REPO/graphs/contributors">
-  <img src="https://contrib.rocks/image?repo=ronaldmannak/PicoProxy" />
+<a href="https://github.com/ronaldmannak/SwiftOpenAIProxy/graphs/contributors">
+  <img src="https://contrib.rocks/image?repo=ronaldmannak/SwiftOpenAIProxy" />
 </a>
