@@ -44,7 +44,6 @@ extension LLMProvider {
         additionalHeaders: nil)
 }
 
-
 extension LLMModel {
     static var models = [LLMModel]()
     
