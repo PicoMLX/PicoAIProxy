@@ -66,39 +66,33 @@ struct AppStoreAuthenticator: HBAsyncAuthenticator {
         //    so the server accepts a transaction Id in sandbox mode as well
         let request = try await request.collateBody().get()
         guard let buffer = request.body.buffer, let body = buffer.getString(at: buffer.readerIndex, length: buffer.readableBytes) else {
-            request.logger.error("/appstore invoked without app store receipt or transaction id in body")
+            request.logger.error("AppStoreAuthenticator: /appstore invoked with empty body")
             throw HBHTTPError(.badRequest)
         }
         
         // Log the app receipt for debugging purposes
-        request.logger.info("parsing body: \(body.count) bytes")
-        if let data = Data(base64Encoded: body), let string = String(data: data, encoding: .utf8) {
-            request.logger.info("Parsing body: \n\(string)")
-        } else {
-            request.logger.error("Body is not an app receipt and unable do decode base64. Body: \n\(body)")
-        }
-        
+        request.logger.info("AppStoreAuthenticator: parsing body: \(body.count) bytes")
+
         // 2. Attempts to extract the transactionId from the receipt
         //    If unsuccessful, assumes the body itself is a transaction ID (useful for sandbox testing)
         guard let transactionId = ReceiptUtility.extractTransactionId(appReceipt: body) else {
             // Body can't be parsed because body isn't the app receipt
             // Retry in sandbox mode
-            request.logger.error("Couldn't extract transaction Id. Trying to validate in sandbox. ")
+            request.logger.error("AppStoreAuthenticator: Couldn't extract transaction Id. Trying to validate in sandbox. ")
             return try await validate(request, transactionId: body, environment: .sandbox)
         }
         
-        request.logger.info("Found transaction ID \(transactionId)")
+        request.logger.info("AppStoreAuthenticator: Found transaction ID \(transactionId)")
 
         // 3. Tries to validate the transaction in production environment first
         //    If not found (404 error), retries in the sandbox environment for TestFlight users
         do {
             return try await validate(request, transactionId: transactionId, environment: .production)
         } catch let error as HBHTTPError where error.status == .notFound {
-            request.logger.info("Caught HBHTTPError.notFound. Validating transaction in sandbox.")
+            request.logger.error("AppStoreAuthenticator: Caught HBHTTPError.notFound. Validating transaction in sandbox.")
             return try await validate(request, transactionId: transactionId, environment: .sandbox)
         }
     }
-    
     
     /// Validates the transaction ID with the App Store and returns a User if successful
     /// - Parameters:
@@ -111,7 +105,7 @@ struct AppStoreAuthenticator: HBAsyncAuthenticator {
         // 1. Create App Store API client
         let appStoreClient = try AppStoreServerAPIClient(signingKey: iapKey, keyId: iapKeyId, issuerId: iapIssuerId, bundleId: bundleId, environment: environment)
         
-        request.logger.info("Created API Client for keyId: \(iapKeyId), issuer: \(iapIssuerId), bundleId: \(bundleId), env: \(environment.rawValue)")
+        request.logger.info("AppStoreAuthenticator: Created API Client for keyId: \(iapKeyId), issuer: \(iapIssuerId), bundleId: \(bundleId), env: \(environment.rawValue)")
         
         // 3. create user
         let user = User(appAccountToken: nil, environment: environment.rawValue, productId: "", status: .expired)
@@ -122,21 +116,21 @@ struct AppStoreAuthenticator: HBAsyncAuthenticator {
         case .success(let response):
             
 //            request.logger.info("TxId: \(transactionId) \(environment.rawValue): Successfully received response from getAllSubscriptionStatuses. Response: \(response)")
-            request.logger.info("TxId: \(transactionId) \(environment.rawValue): number of data: \(response.data?.count ?? 0)")
+            request.logger.info("AppStoreAuthenticator: TxId: \(transactionId) \(environment.rawValue): number of data: \(response.data?.count ?? 0)")
             
             // SwiftProxyServer assumes app has a single subscription group
             guard let subscriptionGroup = response.data?.first,
                   let lastTransactions = subscriptionGroup.lastTransactions else {
-                request.logger.error("TxId: \(transactionId) \(environment.rawValue): Get all subscriptions succeeded but returned no transactions. No subscription group or no last transactions in \(environment.rawValue) for \(transactionId)")
+                request.logger.error("AppStoreAuthenticator: TxId: \(transactionId) \(environment.rawValue): Get all subscriptions succeeded but returned no transactions. No subscription group or no last transactions in \(environment.rawValue) for \(transactionId)")
                 throw HBHTTPError(.unauthorized, message: "No active or grace period subscription status found")
             }
             
-            request.logger.info("TxId: \(transactionId) \(environment.rawValue): Found \(lastTransactions.count) transactions")
+            request.logger.info("AppStoreAuthenticator: TxId: \(transactionId) \(environment.rawValue): Found \(lastTransactions.count) transactions")
             
             // Loop through the transactions in the subscription group
             for transaction in lastTransactions {
                 
-                request.logger.info("Parsing transaction \(transaction.originalTransactionId ?? "(No original tx id)"), status: \(transaction.status?.description ?? "(no known status)")")
+                request.logger.info("AppStoreAuthenticator: Parsing transaction \(transaction.originalTransactionId ?? "(No original tx id)"), status: \(transaction.status?.description ?? "(no known status)")")
                 
                 guard let signedTransactionInfo = transaction.signedTransactionInfo else { continue }
                 
@@ -165,7 +159,7 @@ struct AppStoreAuthenticator: HBAsyncAuthenticator {
                     user.subscriptionStatus = status.rawValue
                 }
                 
-                request.logger.info("TxId: \(transactionId) \(environment.rawValue): Found token \(appAccountToken?.uuidString ?? "(no token)") for \(productId ?? "(no product ID)") in \(environment.rawValue)")
+                request.logger.info("AppStoreAuthenticator: TxId: \(transactionId) \(environment.rawValue): Found token \(appAccountToken?.uuidString ?? "(no token)") for \(productId ?? "(no product ID)") in \(environment.rawValue)")
                             
                 if let _ = user.appAccountToken, !user.productId.isEmpty {
                     // We have all information
@@ -175,15 +169,15 @@ struct AppStoreAuthenticator: HBAsyncAuthenticator {
             
         case .failure(let statusCode, let rawApiError, let apiError, let errorMessage, let causedBy):
             
-            request.logger.error("TxId: \(transactionId) \(environment.rawValue): Get all subscriptions returned an error: code \(statusCode ?? 0), api error: \(rawApiError ?? 0), error msg: \(errorMessage ?? ""), caused by: \(causedBy?.localizedDescription ?? "")")
+            request.logger.error("AppStoreAuthenticator: TxId: \(transactionId) \(environment.rawValue): Get all subscriptions returned an error: code \(statusCode ?? 0), api error: \(rawApiError ?? 0), error msg: \(errorMessage ?? ""), caused by: \(causedBy?.localizedDescription ?? "")")
             
             if statusCode == 404 {
                 // No transaction was found.
-                request.logger.error("TxId: \(transactionId) \(environment.rawValue) not found. Error: \(statusCode ?? -1): \(errorMessage ?? "Unknown error"), \(String(describing: rawApiError)) \(String(describing: apiError)), \(String(describing: causedBy))")
+                request.logger.error("AppStoreAuthenticator: TxId: \(transactionId) \(environment.rawValue) not found. Error: \(statusCode ?? -1): \(errorMessage ?? "Unknown error"), \(String(describing: rawApiError)) \(String(describing: apiError)), \(String(describing: causedBy))")
                 throw HBHTTPError(.notFound)
             } else {
                 // Other error occurred
-                request.logger.error("TxId: \(transactionId) \(environment.rawValue): Get all subscriptions failed in \(environment.rawValue) for \(transactionId). Error: \(statusCode ?? -1): \(errorMessage ?? "Unknown error"), \(String(describing: rawApiError)) \(String(describing: apiError)), \(String(describing: causedBy))")
+                request.logger.error("AppStoreAuthenticator: TxId: \(transactionId) \(environment.rawValue): Get all subscriptions failed in \(environment.rawValue) for \(transactionId). Error: \(statusCode ?? -1): \(errorMessage ?? "Unknown error"), \(String(describing: rawApiError)) \(String(describing: apiError)), \(String(describing: causedBy))")
                 throw HBHTTPError(HTTPResponseStatus(statusCode: statusCode ?? 500, reasonPhrase: errorMessage ?? "Unknown error"))
             }
         }
