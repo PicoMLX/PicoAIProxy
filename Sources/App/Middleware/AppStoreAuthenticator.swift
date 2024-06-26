@@ -72,11 +72,10 @@ struct AppStoreAuthenticator: HBAsyncAuthenticator {
         
         // Log the app receipt for debugging purposes
         request.logger.info("parsing body: \(body.count) bytes")
-        let base64EncodedData = body.data(using: .utf8)!
-        if let data = Data(base64Encoded: base64EncodedData), let string = String(data: data, encoding: .utf8) {
+        if let data = Data(base64Encoded: body), let string = String(data: data, encoding: .utf8) {
             request.logger.info("Parsing body: \n\(string)")
         } else {
-            request.logger.error("Body is not an app receipt and unable do decode base64. Trying to validate in sandbox. Body: \n\(body)")
+            request.logger.error("Body is not an app receipt and unable do decode base64. Body: \n\(body)")
         }
         
         // 2. Attempts to extract the transactionId from the receipt
@@ -84,7 +83,7 @@ struct AppStoreAuthenticator: HBAsyncAuthenticator {
         guard let transactionId = ReceiptUtility.extractTransactionId(appReceipt: body) else {
             // Body can't be parsed because body isn't the app receipt
             // Retry in sandbox mode
-            request.logger.error("Couldn't extract transaction Id")
+            request.logger.error("Couldn't extract transaction Id. Trying to validate in sandbox. ")
             return try await validate(request, transactionId: body, environment: .sandbox)
         }
         
