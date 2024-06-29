@@ -73,18 +73,17 @@ struct AppStoreAuthenticator: HBAsyncAuthenticator {
         // Log the app receipt for debugging purposes
         request.logger.info("AppStoreAuthenticator: parsing body: \(body.count) bytes")
 
-        // 2. Attempts to extract the transactionId from the receipt
-        //    If unsuccessful, assumes the body itself is a transaction ID (useful for sandbox testing)
-        guard let transactionId = ReceiptUtility.extractTransactionId(appReceipt: body) else {
-            // Body can't be parsed because body isn't the app receipt
-            // Retry in sandbox mode
-            request.logger.error("AppStoreAuthenticator: Couldn't extract transaction Id. Trying to validate in sandbox. ")
-            return try await validate(request, transactionId: body, environment: .sandbox)
+        // 2. Extract transaction ID
+        let transactionId: String
+        if let id = ReceiptUtility.extractTransactionId(appReceipt: body) {
+            // Pre-StoreKit 2 App Receipt
+            transactionId = id
+        } else {
+            // StoreKit 2 transaction validated by client
+            transactionId = body
         }
         
-        request.logger.info("AppStoreAuthenticator: Found transaction ID \(transactionId)")
-
-        // 3. Tries to validate the transaction in production environment first
+        // 3. Try validating the transaction in production environment first
         //    If not found (404 error), retries in the sandbox environment for TestFlight users
         do {
             return try await validate(request, transactionId: transactionId, environment: .production)
