@@ -168,9 +168,11 @@ struct AppStoreAuthenticator: HBAsyncAuthenticator {
         if let existingUser = try await User.query(on: request.db)
             .filter(\.$appAccountToken == user.appAccountToken)
             .first() {
+            request.logger.info("addUser found existing user \(payload.appAccountToken?.uuidString ?? "anon") in database")
             return existingUser
         }
         try await user.save(on: request.db)
+        request.logger.info("addUser added user \(payload.appAccountToken?.uuidString ?? "anon") to database")
         return user
     }
     
