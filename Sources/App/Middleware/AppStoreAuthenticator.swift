@@ -70,28 +70,111 @@ struct AppStoreAuthenticator: HBAsyncAuthenticator {
             throw HBHTTPError(.badRequest)
         }
         
-        // Log the app receipt for debugging purposes
-        request.logger.info("AppStoreAuthenticator: parsing body: \(body.count) bytes")
-
-        // 2. Extract transaction ID
-        let transactionId: String
-        if let id = ReceiptUtility.extractTransactionId(appReceipt: body) {
-            // Pre-StoreKit 2 App Receipt
-            transactionId = id
+        if let payload = try await validateJWS(jws: body, environment: .production, request: request) {
+            // Validated production transaction
+            return try await addUser(request: request, payload: payload, environment: .production)
+            
+        } else if let payload = try await validateJWS(jws: body, environment: .sandbox, request: request) {
+            // Validated sandbox transaction
+            return try await addUser(request: request, payload: payload, environment: .sandbox)
+            
+        } else if let payload = try await validateJWS(jws: body, environment: .xcode, request: request) {
+            // Validated Xcode transaction
+            return try await addUser(request: request, payload: payload, environment: .xcode)
+            
         } else {
-            // StoreKit 2 transaction validated by client
-            transactionId = body
-        }
-        
-        // 3. Try validating the transaction in production environment first
-        //    If not found (404 error), retries in the sandbox environment for TestFlight users
-        do {
-            return try await validate(request, transactionId: transactionId, environment: .production)
-        } catch let error as HBHTTPError where error.status == .notFound {
-            request.logger.error("AppStoreAuthenticator: Caught HBHTTPError.notFound. Validating transaction in sandbox.")
-            return try await validate(request, transactionId: transactionId, environment: .sandbox)
+            // Use Store Kit 1 app receipts
+
+            // Extract transaction ID
+            guard let id = ReceiptUtility.extractTransactionId(appReceipt: body) else {
+                throw HBHTTPError(.unauthorized)
+            }
+            let transactionId = id
+            
+            // Try validating the transaction in production environment first
+            // If not found (404 error), retries in the sandbox environment for TestFlight users
+            do {
+                return try await validate(request, transactionId: transactionId, environment: .production)
+            } catch let error as HBHTTPError where error.status == .notFound {
+                request.logger.error("AppStoreAuthenticator: Caught HBHTTPError.notFound. Validating transaction in sandbox.")
+                return try await validate(request, transactionId: transactionId, environment: .sandbox)
+            }
         }
     }
+    
+    /// Validates JWS string and checks expiry date
+    /// - Parameters:
+    ///   - jws: the jws string from the client app
+    ///   - environment: Either .production, .sandbox, or .xcode
+    ///   - request: HBRequest
+    /// - Returns: Payload if successful or nil if jws has a different environment than provided
+    private func validateJWS(jws: String, environment: Environment, request: HBRequest) async throws -> JWSTransactionDecodedPayload? {
+        
+        // 1. Set up JWT verifier
+        let rootCertificates = try loadAppleRootCertificates(request: request)
+        let verifier = try SignedDataVerifier(rootCertificates: rootCertificates, bundleId: bundleId, appAppleId: appAppleId, environment: environment, enableOnlineChecks: true)
+        
+        // 2. Parse JWS transaction
+        let verifyResponse = await verifier.verifyAndDecodeTransaction(signedTransaction: jws)
+        
+        switch verifyResponse {
+        case .valid(let payload):
+            
+            // Check expiry date
+            if let date = payload.expiresDate, date < Date() {
+                request.logger.error("Subscription of user \(payload.appAccountToken?.uuidString ?? "anon") expired. Date: \(date)")
+                throw HBHTTPError(.unauthorized)
+            }
+            
+            request.logger.info("AppStoreAuthenticator: validated tx for user \(payload.appAccountToken?.uuidString ?? "anon") in \(environment)")
+            return payload
+            
+        case .invalid(let error):
+            
+            switch error {
+            case .INVALID_JWT_FORMAT:
+                request.logger.error("validateJWS failed: invalid JWT format")
+            case .INVALID_CERTIFICATE:
+                request.logger.error("validateJWS failed: invalid certificate")
+            case .VERIFICATION_FAILURE:
+                request.logger.error("validateJWS failed: verification failed")
+            case .INVALID_APP_IDENTIFIER:
+                request.logger.error("validateJWS failed: invalid app identifier")
+            case .INVALID_ENVIRONMENT:
+                // Return nil so caller can try a different environment
+                return nil
+            }
+            throw HBHTTPError(.unauthorized)
+        }
+    }
+    
+    /// Finds existing user or creates new user in database
+    /// - Parameters:
+    ///   - request: HBRequest
+    ///   - payload: JWS payload
+    ///   - environment: Either .production, .sandbox, or .xcode
+    /// - Returns: user
+    private func addUser(request: HBRequest, payload: JWSTransactionDecodedPayload, environment: Environment) async throws -> User {
+        
+        // 1. create user
+        let user = User(appAccountToken: nil, environment: environment.rawValue, productId: "", status: .expired)
+        user.appAccountToken = payload.appAccountToken
+        if let productId = payload.productId {
+            user.productId = productId
+        }
+                
+        // 2. If user doesn't exist, add to database
+        //    Otherwise, return existing user
+        if let existingUser = try await User.query(on: request.db)
+            .filter(\.$appAccountToken == user.appAccountToken)
+            .first() {
+            return existingUser
+        }
+        try await user.save(on: request.db)
+        return user
+    }
+    
+    // MARK: - Pre-Store Kit 2 implementation
     
     /// Validates the transaction ID with the App Store and returns a User if successful
     /// - Parameters:
