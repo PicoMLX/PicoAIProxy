@@ -102,6 +102,8 @@ struct AppStoreAuthenticator: HBAsyncAuthenticator {
         }
     }
     
+    // MARK: - Store Kit 2 JWS authentication
+    
     /// Validates JWS string and checks expiry date
     /// - Parameters:
     ///   - jws: the jws string from the client app
@@ -122,7 +124,13 @@ struct AppStoreAuthenticator: HBAsyncAuthenticator {
             
             // Check expiry date
             if let date = payload.expiresDate, date < Date() {
-                request.logger.error("Subscription of user \(payload.appAccountToken?.uuidString ?? "anon") expired. Date: \(date)")
+                request.logger.error("Subscription of user \(payload.appAccountToken?.uuidString ?? "anon") expired on \(date)")
+                throw HBHTTPError(.unauthorized)
+            }
+            
+            // Check revocation date (for refunds and family removal)
+            if let date = payload.revocationDate, date < Date() {
+                request.logger.error("Subscription of user \(payload.appAccountToken?.uuidString ?? "anon") was revoked on \(date)")
                 throw HBHTTPError(.unauthorized)
             }
             
@@ -176,7 +184,7 @@ struct AppStoreAuthenticator: HBAsyncAuthenticator {
         return user
     }
     
-    // MARK: - Pre-Store Kit 2 implementation
+    // MARK: - Pre-Store Kit 2 App Store Receipt authentication
     
     /// Validates the transaction ID with the App Store and returns a User if successful
     /// - Parameters:
@@ -199,7 +207,6 @@ struct AppStoreAuthenticator: HBAsyncAuthenticator {
         switch allSubs {
         case .success(let response):
             
-//            request.logger.info("TxId: \(transactionId) \(environment.rawValue): Successfully received response from getAllSubscriptionStatuses. Response: \(response)")
             request.logger.info("AppStoreAuthenticator: TxId: \(transactionId) \(environment.rawValue): number of data: \(response.data?.count ?? 0)")
             
             // SwiftProxyServer assumes app has a single subscription group

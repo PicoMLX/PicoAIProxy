@@ -125,7 +125,7 @@ The target is the site where all traffic is forwarded to. You can change the tar
 | OpenAI-APIKey | OpenAI API key (sk-...) | https://platform.openai.com |
 | OpenAI-Organization | OpenAI org identifier (org-...) | https://platform.openai.com |
 | Anthropic-APIKey | Anthropic API key (sk-ant-api3-...) | https://docs.anthropic.com/claude/docs/ |
-| ~~allowKeyPassthrough~~ | if 1, requests with a valid OpenAI key and org in the header will be forwarded to OpenAI without modifications (depricated) |
+| ~~allowKeyPassthrough~~ | if 1, requests with a valid OpenAI key and org in the header will be forwarded to OpenAI without modifications (deprecated) |
 
 ### App Store Connect environment variables
 | Variable | Description | reference |
@@ -184,7 +184,128 @@ If the 1 minute limit is reached, the user will be blocked for 5 minutes. If the
 Note 
 Pico AI Proxy currently does not persist data. Upon server restart, any permanently blocked users will be unblocked.
 
-## How to call Pico AI Proxy from your iOS or macOS app
+## How to call Pico AI Proxy from your iOS or macOS App
+
+**Note:** It is highly recommended to set the [`appAccountToken`](https://developer.apple.com/documentation/storekit/product/purchaseoption/3749440-appaccounttoken) to a user-identifying UUID when the user subscribes, like so: 
+```swift
+let result = try await subscription.product.purchase(options: [.appAccountToken(userIdentifyingUUID)])
+```
+Setting the `appAccountToken` enables Pico Proxy to use the value for user-specific rate limiting.
+
+### Client Apps Using StoreKit 2
+
+Here is an overview of the steps to have Pico Proxy validate a purchase and grant a user access:
+1. The client app receives a `Transaction` from the App Store Server after a purchase or via a push notification from the App Store to StoreKit 2.
+2. The client app fetches the signed JWS transaction stored in StoreKit 2's `VerificationResult.jwsRepresentation`.
+3. The client app sends the raw signed JWS transaction in the body of an HTTP POST request to `https://<proxy name>.up.railway.app/appstore`.
+4. The proxy server validates the authenticity and validity of the JWS transaction using Apple's [App Store Server Library](https://github.com/apple/app-store-server-library-swift).
+5. The proxy server creates and returns the session token to the client app.
+6. The client app includes the session token in every call until the session token expires. When it expires, the server will return a 401 Unauthorized error.
+
+**Note:** The client app should always fetch a new session token when it receives a 401 Unauthorized error.
+
+The code below is based on the WWDC StoreKit 2 [Backyard Birds](https://developer.apple.com/documentation/SwiftUI/Backyard-birds-sample) example code.
+
+```swift 
+import StoreKit
+
+@MainActor
+public final class StoreSubscriptionController: ObservableObject {
+    @Published public private(set) var jwsTransaction: String?
+
+    public func purchase(option subscription: Subscription) async -> PurchaseFinishedAction {
+        let action: PurchaseFinishedAction
+        do {
+            // Add user identifier to transaction
+            let idUUID = UUID()            
+            
+            let result = try await subscription.product.purchase(options: [.appAccountToken(idUUID)])
+            switch result {
+            case .success(let verificationResult):
+                // Set the JWS token after purchase
+                jwsTransaction = verificationResult.jwsRepresentation
+        ...
+            }
+        }
+    }
+    
+    // Handle push notification from App Store
+    internal func handle(update status: Product.SubscriptionInfo.Status) {
+        guard case .verified(let transaction) = status.transaction,
+              case .verified(let renewalInfo) = status.renewalInfo else {            
+            return
+        }
+        if status.state == .subscribed || status.state == .inGracePeriod {
+            jwsTransaction = status.transaction.jwsRepresentation
+        }
+        ...
+    }
+    
+    // Handle updated entitlement
+    func updateEntitlement(groupID: String) async {
+        guard let statuses = try? await Product.SubscriptionInfo.status(for: groupID) else {
+            return
+        }
+        for status in statuses {
+            guard case .verified(let transaction) = status.transaction,
+                  case .verified(let renewalInfo) = status.renewalInfo else {
+                continue
+            }
+            if status.state == .subscribed || status.state == .inGracePeriod {
+                jwsTransaction = status.transaction.jwsRepresentation
+            }
+            ...
+        }
+    }
+```
+
+To authenticate a user, call the `appstore` endpoint of Pico Proxy:
+```swift
+
+class PicoClient {
+
+    var authToken: String?
+
+    func authenticate() async throws {    
+        // Set body to `jwsTransaction` property of `StoreSubscriptionController`
+        guard let body = await StoreActor.shared.subscriptionController.jwsTransaction else {
+            // User has no subscription
+            throw YourClientError.noSubscription
+        }
+        
+        let tokenRequest = Request<Token>(
+            path: "appstore",
+            method: .post,
+            body: body,
+            headers: nil)
+        let clientConfiguration = APIClient.Configuration(baseURL: "<Pico Proxy URL here>")
+        let client = APIClient(configuration: clientConfiguration)            
+        let tokenResponse = try await client.send(tokenRequest)
+        self.authToken = tokenResponse.value.token
+    }
+    
+    func chatConnection() -> OpenAIAPIConnection {
+        return OpenAIAPIConnection(apiKey: authToken ?? "NO_KEY",
+                                   organization: organization,
+                                   scheme: scheme.rawValue,
+                                   host: host,
+                                   chatCompletionPath: chatCompletionPath,
+                                   port: port)
+    }
+    ...
+}
+```
+
+### Client Apps Using Deprecated App Store Receipts
+
+**Note:** This method is not recommended as App Store receipts are deprecated, and the process is slower and more error-prone. Instead, use StoreKit 2 as described above. While it is technically possible to use StoreKit 2 *in combination with* App Store receipts, it is not recommended because there is a delay between a purchase and the transaction being included in the App Store receipt, which can lead to incorrect Unauthorized errors from Pico Proxy.
+
+This flow is slightly different:
+1. The client loads the App Store receipt from disk.
+2. The client sends the base64-encoded app receipt in the body of an HTTP POST request to `https://<proxy name>.up.railway.app/appstore`.
+3. Pico Proxy extracts the transaction ID from the App Store receipt and verifies the transaction ID with Apple's App Store Server API.
+4. If the transaction is found, Pico Proxy will create and return a session token to the client app.
+5. The client app includes the session token in every call until the session token expires. When it expires, the server will return a 401 Unauthorized error.
 
 Using [CleverBird](http://github.com/btfranklin/CleverBird/issues)
 ```Swift

@@ -65,7 +65,7 @@ extension HBApplication {
         self.middleware.add(RateLimiterMiddleware())
         
         // 9. Route message to right provider
-        self.middleware.add(MessageRouterMiddleware())
+//        self.middleware.add(MessageRouterMiddleware())
         
         // 10. Add OpenAI API key middleware. This middleware will add the OpenAI org and API key in the header of the request
         self.middleware.add(APIKeyMiddleware())
