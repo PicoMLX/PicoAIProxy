@@ -111,13 +111,15 @@ struct AppStoreAuthenticator: HBAsyncAuthenticator {
     ///   - request: HBRequest
     /// - Returns: Payload if successful or nil if jws has a different environment than provided
     private func validateJWS(jws: String, environment: Environment, request: HBRequest) async throws -> JWSTransactionDecodedPayload? {
-        
+
         // 1. Set up JWT verifier
         let rootCertificates = try loadAppleRootCertificates(request: request)
         let verifier = try SignedDataVerifier(rootCertificates: rootCertificates, bundleId: bundleId, appAppleId: appAppleId, environment: environment, enableOnlineChecks: true)
-        
+        request.logger.debug("environment: \(environment)")
+
         // 2. Parse JWS transaction
         let verifyResponse = await verifier.verifyAndDecodeTransaction(signedTransaction: jws)
+        request.logger.debug("verifyResponse: \(verifyResponse)")
         
         switch verifyResponse {
         case .valid(let payload):
@@ -152,7 +154,9 @@ struct AppStoreAuthenticator: HBAsyncAuthenticator {
                 // Return nil so caller can try a different environment
                 return nil
             }
-            throw HBHTTPError(.unauthorized)
+            // We don't want to throw an error here as it may be caused by an environment mismatch
+            // throw HBHTTPError(.unauthorized)
+            return nil
         }
     }
     
