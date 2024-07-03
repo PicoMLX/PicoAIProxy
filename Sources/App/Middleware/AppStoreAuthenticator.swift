@@ -111,13 +111,15 @@ struct AppStoreAuthenticator: HBAsyncAuthenticator {
     ///   - request: HBRequest
     /// - Returns: Payload if successful or nil if jws has a different environment than provided
     private func validateJWS(jws: String, environment: Environment, request: HBRequest) async throws -> JWSTransactionDecodedPayload? {
-        
+
         // 1. Set up JWT verifier
         let rootCertificates = try loadAppleRootCertificates(request: request)
         let verifier = try SignedDataVerifier(rootCertificates: rootCertificates, bundleId: bundleId, appAppleId: appAppleId, environment: environment, enableOnlineChecks: true)
-        
+        request.logger.debug("environment: \(environment)")
+
         // 2. Parse JWS transaction
         let verifyResponse = await verifier.verifyAndDecodeTransaction(signedTransaction: jws)
+        request.logger.debug("verifyResponse: \(verifyResponse)")
         
         switch verifyResponse {
         case .valid(let payload):
@@ -152,7 +154,9 @@ struct AppStoreAuthenticator: HBAsyncAuthenticator {
                 // Return nil so caller can try a different environment
                 return nil
             }
-            throw HBHTTPError(.unauthorized)
+            // We don't want to throw an error here as it may be caused by an environment mismatch
+            // throw HBHTTPError(.unauthorized)
+            return nil
         }
     }
     
@@ -345,4 +349,52 @@ struct AppStoreAuthenticator: HBAsyncAuthenticator {
         }
         return data
     }
+
+    internal func base64URLToBase64(_ encodedString: String) -> String {
+        let replacedString = encodedString
+            .replacingOccurrences(of: "/", with: "+")
+            .replacingOccurrences(of: "_", with: "-")
+        if (replacedString.count % 4 != 0) {
+            return replacedString + String(repeating: "=", count: 4 - replacedString.count % 4)
+        }
+        return replacedString
+    }
 }
+
+
+private struct RawValueCodingKey: CodingKey {
+
+    private static let keysToRawKeys = ["environment": "rawEnvironment", "receiptType": "rawReceiptType",  "consumptionStatus": "rawConsumptionStatus", "platform": "rawPlatform", "deliveryStatus": "rawDeliveryStatus", "accountTenure": "rawAccountTenure", "playTime": "rawPlayTime", "lifetimeDollarsRefunded": "rawLifetimeDollarsRefunded", "lifetimeDollarsPurchased": "rawLifetimeDollarsPurchased", "userStatus": "rawUserStatus", "status": "rawStatus", "expirationIntent": "rawExpirationIntent", "priceIncreaseStatus": "rawPriceIncreaseStatus", "offerType": "rawOfferType", "type": "rawType", "inAppOwnershipType": "rawInAppOwnershipType", "revocationReason": "rawRevocationReason", "transactionReason": "rawTransactionReason", "offerDiscountType": "rawOfferDiscountType", "notificationType": "rawNotificationType", "subtype": "rawSubtype", "sendAttemptResult": "rawSendAttemptResult", "autoRenewStatus": "rawAutoRenewStatus"]
+    private static let rawKeysToKeys = ["rawEnvironment": "environment", "rawReceiptType": "receiptType",  "rawConsumptionStatus": "consumptionStatus", "rawPlatform": "platform", "rawDeliveryStatus": "deliveryStatus", "rawAccountTenure": "accountTenure", "rawPlayTime": "playTime", "rawLifetimeDollarsRefunded": "lifetimeDollarsRefunded", "rawLifetimeDollarsPurchased": "lifetimeDollarsPurchased", "rawUserStatus": "userStatus", "rawStatus": "status", "rawExpirationIntent": "expirationIntent", "rawPriceIncreaseStatus": "priceIncreaseStatus", "rawOfferType": "offerType", "rawType": "type", "rawInAppOwnershipType": "inAppOwnershipType", "rawRevocationReason": "revocationReason", "rawTransactionReason": "transactionReason", "rawOfferDiscountType": "offerDiscountType", "rawNotificationType": "notificationType", "rawSubtype": "subtype", "rawSendAttemptResult": "sendAttemptResult", "rawAutoRenewStatus": "autoRenewStatus"]
+
+    var stringValue: String
+    var intValue: Int?
+
+    init(stringValue: String) {
+        self.stringValue = stringValue
+        self.intValue = nil
+    }
+
+    init(intValue: Int) {
+        self.stringValue = String(intValue)
+        self.intValue = intValue
+    }
+
+    init(decodingKey: CodingKey) {
+        let decodingKeyString = decodingKey.stringValue
+        self.stringValue = RawValueCodingKey.keysToRawKeys[decodingKeyString, default: decodingKeyString]
+        self.intValue = nil
+    }
+
+    init(encodingKey: CodingKey) {
+        let encodingKeyString = encodingKey.stringValue
+        self.stringValue = RawValueCodingKey.rawKeysToKeys[encodingKeyString, default: encodingKeyString]
+        self.intValue = nil
+    }
+}
+
+struct JWTHeader: Decodable, Encodable {
+    public var alg: String?
+    public var x5c: [String]?
+}
+

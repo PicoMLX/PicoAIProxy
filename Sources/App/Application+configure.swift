@@ -26,7 +26,8 @@ extension HBApplication {
         self.httpClient = HTTPClient(eventLoopGroupProvider: .shared(self.eventLoopGroup))
         
         // 2. Add logging middleware
-        self.logger.logLevel = .info
+        let logLevel = HBEnvironment().get("logLevel") ?? "info"
+        self.logger.logLevel = .init(rawValue: logLevel) ?? .info
         self.middleware.add(HBLogRequestsMiddleware(.info))
         self.middleware.add(HBLogRequestsMiddleware(.debug))
         self.middleware.add(HBLogRequestsMiddleware(.error))
