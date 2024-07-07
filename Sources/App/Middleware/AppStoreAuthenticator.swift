@@ -23,7 +23,8 @@ struct AppStoreAuthenticator: HBAsyncAuthenticator {
     let iapKeyId: String
     let bundleId: String
     let appAppleId: Int64
-    
+    let environment: Environment
+
     /// Initializer to load necessary credentials and configuration from environment variables
     init() throws {
         
@@ -46,13 +47,19 @@ struct AppStoreAuthenticator: HBAsyncAuthenticator {
         else {
             // If the environment variables are not set, SwiftProxyAIServer will throw an internal server error.
             // Check your server's logs for the message below
-            throw HBHTTPError(.internalServerError, message: "IAPPrivateKey, IAPIssuerId, IAPKeyId and/or appBundleId, appAppleId environment variable(s) not set")
+            throw HBHTTPError(.internalServerError, message: "IAPPrivateKey, IAPIssuerId, IAPKeyId and/or appBundleId, appAppleId,  environment variable(s) not set")
         }
+
         self.iapKey = iapKey
         self.iapIssuerId = iapIssuerId
         self.iapKeyId = iapKeyId
         self.bundleId = bundleId
         self.appAppleId = appAppleId
+
+        // making the instance environment specific
+        let environmentString = HBEnvironment().get("environment") ?? "Production"
+        self.environment = Environment(rawValue: environmentString) ?? .production
+
     }
     
     /// Authenticates incoming requests based on App Store receipt or transaction ID
@@ -69,36 +76,42 @@ struct AppStoreAuthenticator: HBAsyncAuthenticator {
             request.logger.error("AppStoreAuthenticator: /appstore invoked with empty body")
             throw HBHTTPError(.badRequest)
         }
-        
-        if let payload = try await validateJWS(jws: body, environment: .production, request: request) {
-            // Validated production transaction
-            return try await addUser(request: request, payload: payload, environment: .production)
-            
-        } else if let payload = try await validateJWS(jws: body, environment: .sandbox, request: request) {
-            // Validated sandbox transaction
-            return try await addUser(request: request, payload: payload, environment: .sandbox)
-            
-        } else if let payload = try await validateJWS(jws: body, environment: .xcode, request: request) {
-            // Validated Xcode transaction
-            return try await addUser(request: request, payload: payload, environment: .xcode)
-            
-        } else {
-            // Use Store Kit 1 app receipts
 
-            // Extract transaction ID
-            guard let id = ReceiptUtility.extractTransactionId(appReceipt: body) else {
-                throw HBHTTPError(.unauthorized)
+        // same proxy instance can be used as both production and sandbox environment
+        request.logger.debug("Attempting to validate StoreKit2 JWS using \(self.environment) environment")
+        if environment == .production {
+            if let payload = try await validateJWS(jws: body, environment: .production, request: request) {
+                // Validated production transaction
+                return try await addUser(request: request, payload: payload, environment: .production)
+
+            } else if let payload = try await validateJWS(jws: body, environment: .sandbox, request: request) {
+                // Validated sandbox transaction
+                return try await addUser(request: request, payload: payload, environment: .sandbox)
             }
-            let transactionId = id
-            
-            // Try validating the transaction in production environment first
-            // If not found (404 error), retries in the sandbox environment for TestFlight users
-            do {
-                return try await validate(request, transactionId: transactionId, environment: .production)
-            } catch let error as HBHTTPError where error.status == .notFound {
-                request.logger.error("AppStoreAuthenticator: Caught HBHTTPError.notFound. Validating transaction in sandbox.")
-                return try await validate(request, transactionId: transactionId, environment: .sandbox)
+        } else {
+            if let payload = try await validateJWS(jws: body, environment: self.environment, request: request) {
+                // Validated sandbox transaction
+                return try await addUser(request: request, payload: payload, environment: self.environment)
             }
+        }
+
+        // If StoreKit 2 verification didn't work -
+        // Use Store Kit 1 app receipts
+        request.logger.debug("Attempting to validate StoreKit 1 app receipt")
+
+        // Extract transaction ID
+        guard let id = ReceiptUtility.extractTransactionId(appReceipt: body) else {
+            throw HBHTTPError(.unauthorized)
+        }
+        let transactionId = id
+
+        // Try validating the transaction in production environment first
+        // If not found (404 error), retries in the sandbox environment for TestFlight users
+        do {
+            return try await validate(request, transactionId: transactionId, environment: .production)
+        } catch let error as HBHTTPError where error.status == .notFound {
+            request.logger.error("AppStoreAuthenticator: Caught HBHTTPError.notFound. Validating transaction in sandbox.")
+            return try await validate(request, transactionId: transactionId, environment: .sandbox)
         }
     }
     
