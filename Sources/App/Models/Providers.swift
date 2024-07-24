@@ -9,8 +9,6 @@ import Foundation
 
 extension LLMProvider {
     
-    static var providers = [openAI, anthropic]
-    
     static var openAI = LLMProvider(
         name: "OpenAI",
         host: "https://api.openai.com",
@@ -47,9 +45,47 @@ extension LLMProvider {
 extension LLMModel {
     static var models = [LLMModel]()
     
-    private static let gptModels = ["gpt-4o", "gpt-4o-2024-05-13", "gpt-4-turbo", "gpt-4-turbo-2024-04-09", "gpt-4-0125-preview", "gpt-4-turbo-preview", "gpt-4-1106-preview", "gpt-4-vision-preview", "gpt-4-1106-vision-preview", "gpt-4", "gpt-4-0613", "gpt-4-32k", "gpt-4-32k-0613", "gpt-3.5-turbo-0125", "gpt-3.5-turbo", "gpt-3.5-turbo-1106", "gpt-3.5-turbo-16k", "gpt-3.5-turbo-0613", "gpt-3.5-turbo-16k-0613"]
-    private static let claudeModels = ["claude-3-opus-20240229", "claude-3-sonnet-20240229", "claude-3-haiku-20240307"]
-    private static let groqModels = ["llama3-8b-8192", "llama3-70b-8192", "mixtral-8x7b-32768", "gemma-7b-it"]
+    private static let gptModels = [
+        "gpt-4o",
+        "gpt-4o-2024-05-13",
+        "gpt-4-turbo",
+        "gpt-4-turbo-2024-04-09",
+        "gpt-4-0125-preview",
+        "gpt-4-turbo-preview",
+        "gpt-4-1106-preview",
+        "gpt-4-vision-preview",
+        "gpt-4-1106-vision-preview",
+        "gpt-4",
+        "gpt-4-0613",
+        "gpt-4-32k",
+        "gpt-4-32k-0613",
+        "gpt-3.5-turbo-0125",
+        "gpt-3.5-turbo", 
+        "gpt-3.5-turbo-1106",
+        "gpt-3.5-turbo-16k",
+        "gpt-3.5-turbo-0613",
+        "gpt-3.5-turbo-16k-0613",
+    ]
+    private static let claudeModels = [
+        "claude-3-opus-20240229",
+        "claude-3-sonnet-20240229",
+        "claude-3-haiku-20240307",
+    ]
+    // TODO: fetch models from API so we're always up to date
+    //  https://api.groq.com/openai/v1/models
+    private static let groqModels = [
+        "llama-3.1-405b-reasoning",
+        "llama-3.1-70b-versatile",
+        "llama-3.1-8b-instant",
+        "llama3-groq-70b-8192-tool-use-preview",
+        "llama3-groq-8b-8192-tool-use-preview",
+        "llama3-70b-8192",
+        "llama3-8b-8192",
+        "mixtral-8x7b-32768",
+        "gemma-7b-it",
+        "gemma2-9b-it",
+        "whisper-large-v3",
+    ]
     
     static func load() {
         for model in gptModels {

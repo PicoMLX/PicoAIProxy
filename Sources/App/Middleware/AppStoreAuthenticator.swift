@@ -139,7 +139,7 @@ struct AppStoreAuthenticator: HBAsyncAuthenticator {
             
             // Check expiry date
             if let date = payload.expiresDate, date < Date() {
-                request.logger.error("Subscription of user \(payload.appAccountToken?.uuidString ?? "anon") expired on \(date)")
+                request.logger.error("Subscription of user \(payload.appAccountToken?.uuidString ?? "anon") expired on \(date). It is now \(Date())")
                 throw HBHTTPError(.unauthorized)
             }
             
