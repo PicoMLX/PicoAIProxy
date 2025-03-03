@@ -28,6 +28,7 @@ extension HBApplication {
         // 2. Add logging middleware
         let logLevel = HBEnvironment().get("logLevel") ?? "info"
         self.logger.logLevel = .init(rawValue: logLevel) ?? .info
+        self.logger.info("Logger level is set to \(self.logger.logLevel)")
         self.middleware.add(HBLogRequestsMiddleware(.info))
         self.middleware.add(HBLogRequestsMiddleware(.debug))
         self.middleware.add(HBLogRequestsMiddleware(.error))
