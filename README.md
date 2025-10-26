@@ -40,6 +40,52 @@ Pico AI Proxy is designed to be compatible with any existing OpenAI library. It 
 | [OpenAI](https://platform.openai.com/docs/models) | ✅ | ✅ | ✅ | ✅ | ✅ |
 | [Anthropic](https://docs.anthropic.com/claude/docs/) | ❌ | ✅ | ❌ | ❌ | ❌ |
 
+### Web search proxy
+
+Pico AI Proxy exposes a `/search` endpoint that reverse-proxies to multiple search providers (currently [Exa](https://exa.ai), [Firecrawl](https://www.firecrawl.dev), and [Tavily](https://tavily.com)). Calls can target either `/search` with a `provider` field in the JSON body or `/search/{provider}`. The request payload accepts a canonical schema:
+
+```json
+{
+  "query": "latest ai news",
+  "provider": "exa",
+  "maxResults": 5,
+  "includeAnswer": true,
+  "includeContent": true,
+  "includeImages": false,
+  "timeRange": "week",
+  "includeDomains": ["openai.com"],
+  "excludeDomains": ["example.com"],
+  "providerOptions": {
+    "type": "neural"
+  },
+  "raw": true
+}
+```
+
+Responses are normalized to a common structure:
+
+```json
+{
+  "provider": "exa",
+  "results": [{
+    "title": "AI Update",
+    "url": "https://example.com",
+    "snippet": "Latest news...",
+    "content": "Full text",
+    "score": 0.92
+  }],
+  "answer": null,
+  "images": [],
+  "meta": {
+    "requestId": "req-123",
+    "cost": 0.01
+  },
+  "raw": { "requestId": "req-123", "results": [] }
+}
+```
+
+When `raw` is omitted or set to `false`, the upstream payload is not included in the response. Provider-specific options can be passed via `providerOptions` and are forwarded verbatim.
+
 ### Supported Models and endpoints
 
 OpenAI:
@@ -125,6 +171,12 @@ The target is the site where all traffic is forwarded to. You can change the tar
 | OpenAI-APIKey | OpenAI API key (sk-...) | https://platform.openai.com |
 | OpenAI-Organization | OpenAI org identifier (org-...) | https://platform.openai.com |
 | Anthropic-APIKey | Anthropic API key (sk-ant-api3-...) | https://docs.anthropic.com/claude/docs/ |
+| Exa-APIKey | Exa search API key | https://docs.exa.ai |
+| Exa-BaseURL (optional) | Override base URL for Exa (defaults to https://api.exa.ai) | |
+| Firecrawl-APIKey | Firecrawl search API key | https://docs.firecrawl.dev |
+| Firecrawl-BaseURL (optional) | Override base URL for Firecrawl (defaults to https://api.firecrawl.dev/v2) | |
+| Tavily-APIKey | Tavily search API key | https://docs.tavily.com |
+| Tavily-BaseURL (optional) | Override base URL for Tavily (defaults to https://api.tavily.com) | |
 | allowKeyPassthrough | if 1, requests with a valid OpenAI key and org in the header will be forwarded to OpenAI without validation |
 
 ### App Store Connect environment variables
