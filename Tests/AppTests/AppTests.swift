@@ -106,6 +106,43 @@ final class AppTests: XCTestCase {
         }
     }
 
+    func testGroqProviderRoutingWithPathPrefix() async throws {
+        let backendRouter = Router()
+        backendRouter.group("openai")
+            .group("v1")
+            .post("chat/completions") { request, _ async throws -> Response in
+                XCTAssertEqual(request.uri.path, "/openai/v1/chat/completions")
+                XCTAssertNil(request.headers[LLMProvider.providerHeaderField])
+                XCTAssertEqual(request.headers[.authorization], "Bearer test-groq-key")
+                return Response(status: .ok, body: .init(byteBuffer: ByteBuffer(string: "{}")))
+            }
+
+        let backendApp = Application(router: backendRouter, configuration: .init(address: .hostname("127.0.0.1", port: 0)))
+
+        try await backendApp.test(.live) { backendClient in
+            guard let backendPort = backendClient.port else {
+                XCTFail("Backend port not found")
+                return
+            }
+
+            setenv("Groq-BaseURL", "http://127.0.0.1:\(backendPort)", 1)
+            defer { unsetenv("Groq-BaseURL") }
+
+            let args = Arguments(location: "", target: "http://example.com")
+            let proxy = try await buildApplication(args)
+
+            try await proxy.test(.live) { client in
+                var headers = defaultHeaders()
+                headers[.contentType] = "application/json"
+                let body = ByteBuffer(string: "{\"messages\": []}")
+                let uri = "/groq/llama-3.1-8b-instant/chat/completions"
+                try await client.execute(uri: uri, method: .post, headers: headers, body: body) { response in
+                    XCTAssertEqual(response.status, .ok)
+                }
+            }
+        }
+    }
+
     private func defaultHeaders() -> HTTPFields {
         var headers: HTTPFields = [:]
         headers[.authorization] = "Bearer sk-test-key"

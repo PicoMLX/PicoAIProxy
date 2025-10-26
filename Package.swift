@@ -10,23 +10,13 @@ let package = Package(
         .executable(name: "App", targets: ["App"]),
     ],
     dependencies: [
-<<<<<<< Updated upstream
-        .package(url: "https://github.com/hummingbird-project/hummingbird.git", from: "2.0.0-beta.1"),
-        .package(url: "https://github.com/hummingbird-project/hummingbird-auth.git", from: "2.0.0-beta.1"),
-        .package(url: "https://github.com/hummingbird-project/hummingbird-fluent.git", from: "2.0.0-beta.1"),
-        .package(url: "https://github.com/apple/swift-argument-parser.git", from: "1.3.0"),
-        .package(url: "https://github.com/swift-server/async-http-client.git", from: "1.19.0"),
-        .package(url: "https://github.com/apple/app-store-server-library-swift.git", from: "1.0.1"),
-        .package(url: "https://github.com/vapor/jwt-kit.git", from: "4.0.0"),
-=======
-        .package(url: "https://github.com/hummingbird-project/hummingbird.git", from: "2.0.0"),
-        .package(url: "https://github.com/hummingbird-project/hummingbird-auth", from: "2.0.0"),
-        .package(url: "https://github.com/apple/swift-argument-parser.git", from: "1.4.0"),
-        .package(url: "https://github.com/swift-server/async-http-client.git", from: "1.19.0"),
-        .package(url: "https://github.com/apple/app-store-server-library-swift.git", from: "1.0.1"),
-        .package(url: "https://github.com/vapor/jwt-kit.git", from: "4.0.0"),
+        .package(url: "https://github.com/hummingbird-project/hummingbird.git", from: "2.17.0"),
+        .package(url: "https://github.com/hummingbird-project/hummingbird-auth.git", from: "2.1.0"),
         .package(url: "https://github.com/hummingbird-project/hummingbird-fluent.git", from: "2.0.0"),
->>>>>>> Stashed changes
+        .package(url: "https://github.com/apple/swift-argument-parser.git", from: "1.6.2"),
+        .package(url: "https://github.com/swift-server/async-http-client.git", from: "1.19.0"),
+        .package(url: "https://github.com/apple/app-store-server-library-swift.git", from: "1.0.1"),
+        .package(url: "https://github.com/vapor/jwt-kit.git", from: "4.0.0"),
         .package(url: "https://github.com/vapor/fluent-kit.git", from: "1.16.0"),
         .package(url: "https://github.com/vapor/fluent-sqlite-driver.git", from: "4.0.0"),
     ],
@@ -54,20 +44,11 @@ let package = Package(
                 .unsafeFlags(["-cross-module-optimization"], .when(configuration: .release))
             ]
         ),
-<<<<<<< Updated upstream
-//        .testTarget(name: "AppTests",
-//            dependencies: [
-//                .byName(name: "App"),
-//                .product(name: "HummingbirdTesting", package: "hummingbird"),
-//                .product(name: "HummingbirdAuthTesting", package: "hummingbird-auth"),            ]
-//        )
-=======
         .testTarget(name: "AppTests",
             dependencies: [
                 .byName(name: "App"),
                 .product(name: "HummingbirdTesting", package: "hummingbird")
             ]
         )
->>>>>>> Stashed changes
     ]
 )

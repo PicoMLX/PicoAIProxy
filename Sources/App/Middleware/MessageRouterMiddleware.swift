@@ -22,31 +22,42 @@ struct MessageRouterMiddleware: RouterMiddleware {
 
         var request = request
         let buffer = try await request.collectBody(upTo: context.maxUploadSize)
-        guard let body = buffer.getString(at: buffer.readerIndex, length: buffer.readableBytes),
-              let data = body.data(using: .utf8) else {
-            context.logger.error("Unable to decode body in MessageRouterMiddleware")
-            throw HTTPError(.badRequest)
-        }
+        let bodyString = buffer.getString(at: buffer.readerIndex, length: buffer.readableBytes) ?? ""
+        let data = bodyString.data(using: .utf8) ?? Data()
 
         var headers = request.headers
-        var path = request.head.path ?? request.uri.path
+        let originalPath = request.head.path ?? request.uri.path
+        let segments = Self.pathSegments(from: originalPath)
 
-        if let model = LLMModel.fetchModel(from: data) {
+        var provider: LLMProvider?
+        var path = originalPath
+
+        if segments.count >= 2, let candidate = LLMProvider.provider(for: String(segments[0])) {
+            provider = candidate
+            let model = String(segments[1])
+            let remainder = Array(segments.dropFirst(2))
+            path = candidate.normalisedPath(withRemainder: remainder)
+            candidate.annotate(headers: &headers, model: model)
+        }
+
+        if provider == nil, let model = LLMModel.fetchModel(from: data) {
             context.logger.info("Rerouting \(model.name) to \(model.provider.name)")
-            if let modelHeader = HTTPField.Name("model") {
-                headers[modelHeader] = model.name
-            }
             if !model.proxy().location.isEmpty {
                 path = model.proxy().location
             }
+            model.provider.annotate(headers: &headers, model: model.name)
         }
 
         var head = request.head
         head.headerFields = headers
-        head.path = path
+        head.path = path.isEmpty ? "/" : path
 
         let updatedRequest = Request(head: head, body: request.body)
         return try await next(updatedRequest, context)
+    }
+
+    private static func pathSegments(from path: String) -> [Substring] {
+        path.split(separator: "/", omittingEmptySubsequences: true)
     }
 }
 

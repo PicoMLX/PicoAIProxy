@@ -8,12 +8,15 @@
 import Foundation
 
 extension LLMProvider {
-    
-    static var providers = [openAI, anthropic]
-    
+
+    static var providers: [LLMProvider] { [openAI, anthropic, groq] }
+
     static var openAI = LLMProvider(
+        slug: "openai",
         name: "OpenAI",
         host: "https://api.openai.com",
+        hostEnvKey: nil,
+        pathPrefix: nil,
         apiEnvKey: "OpenAI-APIKey",
         apiHeaderKey: "Authorization",
         bearer: true,
@@ -21,10 +24,13 @@ extension LLMProvider {
         orgHeaderKey: "OpenAI-Organization",
         additionalHeaders: nil
     )
-    
+
     static var anthropic = LLMProvider(
+        slug: "anthropic",
         name: "Anthropic",
         host: "https://api.anthropic.com",
+        hostEnvKey: nil,
+        pathPrefix: nil,
         apiEnvKey: "Anthropic-APIKey",
         apiHeaderKey: "x-api-key",
         bearer: false,
@@ -32,21 +38,48 @@ extension LLMProvider {
         orgHeaderKey: nil,
         additionalHeaders: ["anthropic-version": "2023-06-01"]
     )
+
+    static var groq = LLMProvider(
+        slug: "groq",
+        name: "Groq",
+        host: "https://api.groq.com",
+        hostEnvKey: "Groq-BaseURL",
+        pathPrefix: "/openai/v1",
+        apiEnvKey: "Groq-APIKey",
+        apiHeaderKey: "Authorization",
+        bearer: true,
+        orgEnvKey: nil,
+        orgHeaderKey: nil,
+        additionalHeaders: nil
+    )
 }
 
 
 extension LLMModel {
     static var models = [LLMModel]()
-    
+
     private static let gptModels = ["gpt-4-turbo", "gpt-4-turbo-2024-04-09", "gpt-4-0125-preview", "gpt-4-turbo-preview", "gpt-4-1106-preview", "gpt-4-vision-preview", "gpt-4-1106-vision-preview", "gpt-4", "gpt-4-0613", "gpt-4-32k", "gpt-4-32k-0613", "gpt-3.5-turbo-0125", "gpt-3.5-turbo", "gpt-3.5-turbo-1106", "gpt-3.5-turbo-16k", "gpt-3.5-turbo-0613", "gpt-3.5-turbo-16k-0613"]
     private static let claudeModels = ["claude-3-opus-20240229", "claude-3-sonnet-20240229", "claude-3-haiku-20240307"]
-    
+    private static let groqModels = [
+        "llama-3.1-405b-reasoning",
+        "llama-3.1-70b-versatile",
+        "llama-3.1-8b-instant",
+        "llama-3.1-70b-specdec",
+        "mixtral-8x7b-32768",
+        "gemma2-9b-it",
+        "gemma-7b-it"
+    ]
+
     static func load() {
+        guard models.isEmpty else { return }
         for model in gptModels {
-            models.append(LLMModel(name: model, endpoint: "", provider: LLMProvider.openAI)) // leaving endpoint empty so all calls will be forwarded to original path /v1/chat/completions
+            models.append(LLMModel(name: model, endpoint: "", provider: LLMProvider.openAI))
         }
         for model in claudeModels {
             models.append(LLMModel(name: model, endpoint: "/v1/messages", provider: LLMProvider.anthropic))
+        }
+        for model in groqModels {
+            models.append(LLMModel(name: model, endpoint: "", provider: LLMProvider.groq))
         }
     }
 }

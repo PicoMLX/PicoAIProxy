@@ -20,9 +20,12 @@ struct APIKeyMiddleware: RouterMiddleware {
         headers[.authorization] = nil
 
         do {
-            if let modelHeader = HTTPField.Name("model"),
-               let modelName = headers[modelHeader],
-               let model = LLMModel.fetch(model: modelName) {
+            if let providerSlug = headers[LLMProvider.providerHeaderField],
+               let provider = LLMProvider.provider(for: providerSlug) {
+                try provider.setHeaders(fields: &headers)
+            } else if let modelHeader = HTTPField.Name("model"),
+                      let modelName = headers[modelHeader],
+                      let model = LLMModel.fetch(model: modelName) {
                 try model.provider.setHeaders(fields: &headers)
             } else {
                 try LLMProvider.openAI.setHeaders(fields: &headers)
