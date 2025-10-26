@@ -5,48 +5,43 @@
 //  Created by Ronald Mannak on 1/21/24.
 //
 
-import Foundation
 import FluentKit
+import Foundation
 import Hummingbird
-import HummingbirdAuth
+import HummingbirdFluent
+import HTTPTypes
 import AppStoreServerLibrary
+typealias StoreEnvironment = AppStoreServerLibrary.Environment
 #if os(Linux)
 import FoundationNetworking
 #endif
 
 /// Defines a custom authenticator for App Store transactions
-struct AppStoreAuthenticator: HBAsyncAuthenticator {
-   
-    // Properties to hold App Store credentials and app-specific information
+struct AppStoreAuthenticator: RouterMiddleware {
+    typealias Context = ProxyRequestContext
+
+    let fluent: Fluent
     let iapKey: String
     let iapIssuerId: String
     let iapKeyId: String
     let bundleId: String
     let appAppleId: Int64
-    
-    /// Initializer to load necessary credentials and configuration from environment variables
-    init() throws {
-        
-        // Fetch IAP private key, issuer ID, and Key ID from environment variables
-        // Information about creating a private key is available in Apple's documentation
-        // Failing to find required environment variables results in an error
-        // To create a private key, see:
-        //    https://developer.apple.com/documentation/appstoreserverapi/creating_api_keys_to_use_with_the_app_store_server_api
-        //    and https://developer.apple.com/wwdc23/10143
-        guard let iapKey = HBEnvironment().get("IAPPrivateKey")?.replacingOccurrences(of: "\\\\n", with: "\n"),
+
+    init(fluent: Fluent) throws {
+        self.fluent = fluent
+        let processEnvironment = Hummingbird.Environment()
+        guard let iapKey = processEnvironment.get("IAPPrivateKey")?.replacingOccurrences(of: "\\\n", with: "\n"),
               !iapKey.isEmpty,
-              let iapIssuerId = HBEnvironment().get("IAPIssuerId"),
+              let iapIssuerId = processEnvironment.get("IAPIssuerId"),
               !iapIssuerId.isEmpty,
-              let iapKeyId = HBEnvironment().get("IAPKeyId"),
+              let iapKeyId = processEnvironment.get("IAPKeyId"),
               !iapKeyId.isEmpty,
-              let bundleId = HBEnvironment().get("appBundleId"),
+              let bundleId = processEnvironment.get("appBundleId"),
               !bundleId.isEmpty,
-              let appAppleIdString = HBEnvironment().get("appAppleId"),
+              let appAppleIdString = processEnvironment.get("appAppleId"),
               let appAppleId = Int64(appAppleIdString)
         else {
-            // If the environment variables are not set, SwiftProxyAIServer will throw an internal server error.
-            // Check your server's logs for the message below
-            throw HBHTTPError(.internalServerError, message: "IAPPrivateKey, IAPIssuerId, IAPKeyId and/or appBundleId, appAppleId environment variable(s) not set")
+            throw HTTPError(.internalServerError, message: "IAPPrivateKey, IAPIssuerId, IAPKeyId and/or appBundleId, appAppleId environment variable(s) not set")
         }
         self.iapKey = iapKey
         self.iapIssuerId = iapIssuerId
@@ -54,6 +49,7 @@ struct AppStoreAuthenticator: HBAsyncAuthenticator {
         self.bundleId = bundleId
         self.appAppleId = appAppleId
     }
+<<<<<<< Updated upstream
     
     /// Authenticates incoming requests based on App Store receipt or transaction ID
     /// - Parameter request: HBRequest
@@ -132,32 +128,152 @@ struct AppStoreAuthenticator: HBAsyncAuthenticator {
                 
                 request.logger.info("Parsing transaction \(transaction.originalTransactionId ?? "(No original tx id)"), status: \(transaction.status?.description ?? "(no known status)")")
                 
+=======
+
+    func handle(_ request: Request, context: Context, next: (Request, Context) async throws -> Response) async throws -> Response {
+        if !request.uri.path.hasPrefix("/appstore") {
+            return try await next(request, context)
+        }
+
+        var request = request
+        let body = try await collectBodyString(&request, context: context)
+        let logger = context.logger
+        let db = fluent.db()
+
+        if let payload = try await validateJWS(jws: body, environment: StoreEnvironment.production, logger: logger) {
+            let user = try await addUser(payload: payload, environment: StoreEnvironment.production, db: db, logger: logger)
+            var context = context
+            context.identity = user
+            return try await next(request, context)
+        } else if let payload = try await validateJWS(jws: body, environment: StoreEnvironment.sandbox, logger: logger) {
+            let user = try await addUser(payload: payload, environment: StoreEnvironment.sandbox, db: db, logger: logger)
+            var context = context
+            context.identity = user
+            return try await next(request, context)
+        } else if let payload = try await validateJWS(jws: body, environment: StoreEnvironment.xcode, logger: logger) {
+            let user = try await addUser(payload: payload, environment: StoreEnvironment.xcode, db: db, logger: logger)
+            var context = context
+            context.identity = user
+            return try await next(request, context)
+        }
+
+        guard let transactionId = ReceiptUtility.extractTransactionId(appReceipt: body) else {
+            throw HTTPError(.unauthorized)
+        }
+
+        do {
+            if let user = try await validate(transactionId: transactionId, environment: StoreEnvironment.production, db: db, logger: logger) {
+                var context = context
+                context.identity = user
+                return try await next(request, context)
+            }
+        } catch let error as HTTPError where error.status == .notFound {
+            logger.error("AppStoreAuthenticator: Production lookup failed. Falling back to sandbox for transaction \(transactionId)")
+            if let user = try await validate(transactionId: transactionId, environment: StoreEnvironment.sandbox, db: db, logger: logger) {
+                var context = context
+                context.identity = user
+                return try await next(request, context)
+            }
+        }
+
+        throw HTTPError(.unauthorized)
+    }
+
+    private func collectBodyString(_ request: inout Request, context: Context) async throws -> String {
+        let buffer = try await request.collectBody(upTo: context.maxUploadSize)
+        guard let body = buffer.getString(at: buffer.readerIndex, length: buffer.readableBytes) else {
+            throw HTTPError(.badRequest)
+        }
+        return body
+    }
+
+    private func validateJWS(jws: String, environment: StoreEnvironment, logger: Logger) async throws -> JWSTransactionDecodedPayload? {
+        let rootCertificates = try loadAppleRootCertificates(logger: logger)
+        let verifier = try SignedDataVerifier(rootCertificates: rootCertificates, bundleId: bundleId, appAppleId: appAppleId, environment: environment, enableOnlineChecks: true)
+        logger.debug("AppStoreAuthenticator: validating JWS in \(environment)")
+
+        let verifyResponse = await verifier.verifyAndDecodeTransaction(signedTransaction: jws)
+        switch verifyResponse {
+        case .valid(let payload):
+            if let date = payload.expiresDate, date < Date() {
+                logger.error("Subscription for \(payload.appAccountToken?.uuidString ?? "anon") expired on \(date)")
+                throw HTTPError(.unauthorized)
+            }
+            if let date = payload.revocationDate, date < Date() {
+                logger.error("Subscription for \(payload.appAccountToken?.uuidString ?? "anon") revoked on \(date)")
+                throw HTTPError(.unauthorized)
+            }
+            logger.info("AppStoreAuthenticator: validated JWS for user \(payload.appAccountToken?.uuidString ?? "anon") in \(environment)")
+            return payload
+
+        case .invalid(let error):
+            switch error {
+            case .INVALID_JWT_FORMAT:
+                logger.error("AppStoreAuthenticator: invalid JWT format")
+            case .INVALID_CERTIFICATE:
+                logger.error("AppStoreAuthenticator: invalid certificate")
+            case .VERIFICATION_FAILURE:
+                logger.error("AppStoreAuthenticator: verification failure")
+            case .INVALID_APP_IDENTIFIER:
+                logger.error("AppStoreAuthenticator: invalid app identifier")
+            case .INVALID_ENVIRONMENT:
+                return nil
+            }
+            return nil
+        }
+    }
+
+    private func addUser(payload: JWSTransactionDecodedPayload, environment: StoreEnvironment, db: Database, logger: Logger) async throws -> User {
+        let user = User(appAccountToken: nil, environment: environment.rawValue, productId: "", status: .expired)
+        user.appAccountToken = payload.appAccountToken
+        if let productId = payload.productId {
+            user.productId = productId
+        }
+
+        if let existingUser = try await User.query(on: db)
+            .filter(\.$appAccountToken == user.appAccountToken)
+            .first() {
+            logger.info("AppStoreAuthenticator: found existing user \(payload.appAccountToken?.uuidString ?? "anon")")
+            return existingUser
+        }
+
+        try await user.save(on: db)
+        logger.info("AppStoreAuthenticator: added user \(payload.appAccountToken?.uuidString ?? "anon") to database")
+        return user
+    }
+
+    private func validate(transactionId: String, environment: StoreEnvironment, db: Database, logger: Logger) async throws -> User? {
+        let appStoreClient = try AppStoreServerAPIClient(signingKey: iapKey, keyId: iapKeyId, issuerId: iapIssuerId, bundleId: bundleId, environment: environment)
+
+        logger.info("AppStoreAuthenticator: validating transaction \(transactionId) in \(environment.rawValue)")
+
+        let result = await appStoreClient.getAllSubscriptionStatuses(transactionId: transactionId, status: [.active, .billingGracePeriod])
+        switch result {
+        case .success(let response):
+            guard let subscriptionGroup = response.data?.first,
+                  let lastTransactions = subscriptionGroup.lastTransactions else {
+                logger.error("AppStoreAuthenticator: no transactions returned for \(transactionId) in \(environment.rawValue)")
+                throw HTTPError(.unauthorized, message: "No active or grace period subscription status found")
+            }
+
+            let user = User(appAccountToken: nil, environment: environment.rawValue, productId: "", status: .expired)
+            for transaction in lastTransactions {
+>>>>>>> Stashed changes
                 guard let signedTransactionInfo = transaction.signedTransactionInfo else { continue }
-                
-                let appAccountToken: UUID?
-                let productId: String?
                 do {
-                    let (token, product) = try await fetchUserAppAccountToken(signedTransactionInfo: signedTransactionInfo, environment: environment, request: request)
-                    appAccountToken = token
-                    productId = product
+                    let (token, product) = try await fetchUserAppAccountToken(signedTransactionInfo: signedTransactionInfo, environment: environment, logger: logger)
+                    user.appAccountToken = token
+                    if let product {
+                        user.productId = product
+                    }
                 } catch {
-                    // Skip to next product in case of an error
                     continue
                 }
 
-                if let productId {
-                    user.productId = productId
-                }
-                
-                if let appAccountToken {
-                    user.appAccountToken = appAccountToken
-                }
-                
-                // We're only saving one subscription, an active one if available.
-                // Update user.status. Make sure we don't overwrite it if the status is already .active
                 if user.subscriptionStatus != Status.active.rawValue, let status = transaction.status {
                     user.subscriptionStatus = status.rawValue
                 }
+<<<<<<< Updated upstream
                 
                 request.logger.info("TxId: \(transactionId) \(environment.rawValue): Found token \(appAccountToken?.uuidString ?? "(no token)") for \(productId ?? "(no product ID)") in \(environment.rawValue)")
                             
@@ -179,77 +295,74 @@ struct AppStoreAuthenticator: HBAsyncAuthenticator {
                 // Other error occurred
                 request.logger.error("TxId: \(transactionId) \(environment.rawValue): Get all subscriptions failed in \(environment.rawValue) for \(transactionId). Error: \(statusCode ?? -1): \(errorMessage ?? "Unknown error"), \(String(describing: rawApiError)) \(String(describing: apiError)), \(String(describing: causedBy))")
                 throw HBHTTPError(HTTPResponseStatus(statusCode: statusCode ?? 500, reasonPhrase: errorMessage ?? "Unknown error"))
+=======
+
+                if user.appAccountToken != nil, !user.productId.isEmpty {
+                    break
+                }
             }
+
+            if let existingUser = try await User.query(on: db)
+                .filter(\.$appAccountToken == user.appAccountToken)
+                .first() {
+                return existingUser
+>>>>>>> Stashed changes
+            }
+            try await user.save(on: db)
+            return user
+
+        case .failure(let statusCode, _, let apiError, let errorMessage, let causedBy):
+            let errorDescription = errorMessage ?? apiError.map { String(describing: $0) } ?? "Unknown"
+            let causeDescription = causedBy?.localizedDescription ?? "none"
+            logger.error("AppStoreAuthenticator: transaction \(transactionId) failed in \(environment.rawValue) - status: \(statusCode ?? 0), error: \(errorDescription), caused by: \(causeDescription)")
+            if statusCode == 404 {
+                throw HTTPError(.notFound)
+            }
+            throw HTTPError(HTTPResponse.Status(code: statusCode ?? 500, reasonPhrase: errorMessage ?? "Unknown error"))
         }
-        
-        // 5. If user doesn't exist, add to database
-        //    Otherwise, return existing user
-        if let existingUser = try await User.query(on: request.db)
-            .filter(\.$appAccountToken == user.appAccountToken)
-            .first() {
-            return existingUser
-        }
-        try await user.save(on: request.db)
-        return user
     }
-    
-    /// Fetches app account token set by client app and productID
-    /// Note: Token is nil when client app doesn't set appAccountToken during the purchase
-    /// See https://developer.apple.com/documentation/storekit/product/3791971-purchase
-    /// - Parameters:
-    ///   - signedTransactionInfo: SignedTransactionInfo fetched by getAllSubscriptionStatuses
-    ///   - environment: E.g. .sandbox
-    ///   - request: The request (to access logger)
-    /// - Returns: Tuple of optional appAccountToken and optional productID
-    private func fetchUserAppAccountToken(signedTransactionInfo: String, environment: Environment, request: HBRequest) async throws -> (UUID?, String?) {
-                
-        // 1. Set up JWT verifier
-        let rootCertificates = try loadAppleRootCertificates(request: request)
+
+    private func fetchUserAppAccountToken(signedTransactionInfo: String, environment: StoreEnvironment, logger: Logger) async throws -> (UUID?, String?) {
+        let rootCertificates = try loadAppleRootCertificates(logger: logger)
         let verifier = try SignedDataVerifier(rootCertificates: rootCertificates, bundleId: bundleId, appAppleId: appAppleId, environment: environment, enableOnlineChecks: true)
-        
-        // 5. Parse signed transaction
-        let verifyResponse = await verifier.verifyAndDecodeTransaction(signedTransaction: signedTransactionInfo)
-        
-        switch verifyResponse {
+        let response = await verifier.verifyAndDecodeTransaction(signedTransaction: signedTransactionInfo)
+
+        switch response {
         case .valid(let payload):
-
             return (payload.appAccountToken, payload.productId)
-
         case .invalid(let error):
-                        
-            request.logger.error("Verifying transaction failed. Error: \(error)")
-            throw HBHTTPError(.unauthorized)
+            logger.error("AppStoreAuthenticator: verifying transaction failed with error \(error)")
+            throw HTTPError(.unauthorized)
         }
     }
-    
-    private func loadAppleRootCertificates(request: HBRequest) throws -> [Foundation.Data] {
+
+    private func loadAppleRootCertificates(logger: Logger) throws -> [Foundation.Data] {
         #if os(Linux)
-        // Linux doesn't have app bundles, so we're copying the certificates in the Dockerfile to /app/Resources and load them manually
         return [
-            try loadData(url: URL(string: "/app/Resources/AppleComputerRootCertificate.cer"), request: request),
-            try loadData(url: URL(string: "/app/Resources/AppleIncRootCertificate.cer"), request: request),
-            try loadData(url: URL(string: "/app/Resources/AppleRootCA-G2.cer"), request: request),
-            try loadData(url: URL(string: "/app/Resources/AppleRootCA-G3.cer"), request: request),
+            try loadData(url: URL(string: "/app/Resources/AppleComputerRootCertificate.cer"), logger: logger),
+            try loadData(url: URL(string: "/app/Resources/AppleIncRootCertificate.cer"), logger: logger),
+            try loadData(url: URL(string: "/app/Resources/AppleRootCA-G2.cer"), logger: logger),
+            try loadData(url: URL(string: "/app/Resources/AppleRootCA-G3.cer"), logger: logger),
         ].compactMap { $0 }
         #else
         return [
-            try loadData(url: Bundle.module.url(forResource: "AppleComputerRootCertificate", withExtension: "cer"), request: request),
-            try loadData(url: Bundle.module.url(forResource: "AppleIncRootCertificate", withExtension: "cer"), request: request),
-            try loadData(url: Bundle.module.url(forResource: "AppleRootCA-G2", withExtension: "cer"), request: request),
-            try loadData(url: Bundle.module.url(forResource: "AppleRootCA-G3", withExtension: "cer"), request: request),
+            try loadData(url: Bundle.module.url(forResource: "AppleComputerRootCertificate", withExtension: "cer"), logger: logger),
+            try loadData(url: Bundle.module.url(forResource: "AppleIncRootCertificate", withExtension: "cer"), logger: logger),
+            try loadData(url: Bundle.module.url(forResource: "AppleRootCA-G2", withExtension: "cer"), logger: logger),
+            try loadData(url: Bundle.module.url(forResource: "AppleRootCA-G3", withExtension: "cer"), logger: logger),
         ].compactMap { $0 }
         #endif
     }
-    
-    private func loadData(url: URL?, request: HBRequest) throws -> Foundation.Data? {
-        let fs = FileManager()
-        guard let url = url, fs.fileExists(atPath: url.path) else {
-            request.logger.error("File missing: \(url?.absoluteString ?? "invalid url")")
-            throw HBHTTPError(.internalServerError)
+
+    private func loadData(url: URL?, logger: Logger) throws -> Foundation.Data? {
+        let fileManager = FileManager()
+        guard let url, fileManager.fileExists(atPath: url.path) else {
+            logger.error("AppStoreAuthenticator: missing certificate at \(url?.absoluteString ?? "(nil)")")
+            throw HTTPError(.internalServerError)
         }
-                
-        guard let data = fs.contents(atPath: url.path) else {
-            request.logger.error("Can't read data from \(url.absoluteString)")
+
+        guard let data = fileManager.contents(atPath: url.path) else {
+            logger.error("AppStoreAuthenticator: unable to read certificate at \(url.absoluteString)")
             return nil
         }
         return data

@@ -2,7 +2,7 @@
 //
 // This source file is part of the Hummingbird server framework project
 //
-// Copyright (c) 2021-2021 the Hummingbird authors
+// Copyright (c) 2021-2024 the Hummingbird authors
 // Licensed under Apache License v2.0
 //
 // See LICENSE.txt for license information
@@ -16,7 +16,11 @@ import AsyncHTTPClient
 import Hummingbird
 import HummingbirdCore
 import Logging
+import HTTPTypes
+import NIOHTTP1
+import NIOHTTPTypesHTTP1
 
+<<<<<<< Updated upstream
 /// Middleware forwarding requests onto another server
 struct ProxyServerMiddleware: RouterMiddleware {
     typealias Context = ProxyRequestContext
@@ -106,6 +110,13 @@ extension String {
 /// Middleware forwarding requests onto another server
 public struct HBProxyServerMiddleware: HBMiddleware {
     public struct Proxy {
+=======
+/// Middleware forwarding requests onto another server based on the selected LLM model.
+struct ProxyServerMiddleware: RouterMiddleware {
+    typealias Context = ProxyRequestContext
+
+    struct Proxy: Sendable {
+>>>>>>> Stashed changes
         let location: String
         let target: String
 
@@ -116,97 +127,84 @@ public struct HBProxyServerMiddleware: HBMiddleware {
     }
 
     let httpClient: HTTPClient
+    let defaultProxy: Proxy
 
-    public init(httpClient: HTTPClient) {
+    init(httpClient: HTTPClient, defaultProxy: Proxy = Proxy(location: "", target: "https://api.openai.com")) {
         self.httpClient = httpClient
+        self.defaultProxy = defaultProxy
     }
 
-    public func apply(to request: HBRequest, next: HBResponder) -> EventLoopFuture<HBResponse> {
-        
+    func handle(_ request: Request, context: Context, next: (Request, Context) async throws -> Response) async throws -> Response {
         let proxy: Proxy
-        if let modelName = request.headers.first(name: "model"), let model = LLMModel.fetch(model: modelName) {
+        if let modelHeaderName = HTTPField.Name("model"),
+           let modelName = request.headers[modelHeaderName],
+           let model = LLMModel.fetch(model: modelName) {
             proxy = model.proxy()
         } else {
-            proxy = Proxy(location: "", target: "https://api.openai.com")
+            proxy = defaultProxy
         }
-        
-        guard let responseFuture = forward(request: request, to: proxy) else {
-            return next.respond(to: request)
+
+        guard let response = try await forward(request: request, to: proxy, context: context) else {
+            return try await next(request, context)
         }
-        return responseFuture
+        return response
     }
 
-    func forward(request: HBRequest, to proxy: Proxy) -> EventLoopFuture<HBResponse>? {
+    private func forward(request: Request, to proxy: Proxy, context: Context) async throws -> Response? {
         guard request.uri.description.hasPrefix(proxy.location) else { return nil }
-        let newURI = request.uri.description //.dropFirst(proxy.location.count) // TODO: not sure if this boilerplate code did anything we want it to do. Refactor after HummingBird 2.0
+        let newURI = request.uri.description
         guard newURI.first == nil || newURI.first == "/" else { return nil }
-        
-        do {
-            // create request
-            let ahcRequest = try request.ahcRequest(uri: String(newURI), host: proxy.target, eventLoop: request.eventLoop)
 
-            request.logger.info("\(request.uri) -> \(ahcRequest.url)")
+        var clientRequest = HTTPClientRequest(url: "\(proxy.target)\(newURI)")
+        clientRequest.method = .init(request.method)
+        clientRequest.headers = .init(request.headers)
 
-            // create response body streamer
-            let streamer = HBByteBufferStreamer(eventLoop: request.eventLoop, maxSize: 2048 * 1024, maxStreamingBufferSize: 128 * 1024)
-            // delegate for streaming bytebuffers from AsyncHTTPClient
-            let delegate = StreamingResponseDelegate(on: request.eventLoop, streamer: streamer)
-            // execute request
-            _ = self.httpClient.execute(
-                request: ahcRequest,
-                delegate: delegate,
-                eventLoop: .delegateAndChannel(on: request.eventLoop),
-                logger: request.logger
-            )
-            // when delegate receives header then signal completion
-            return delegate.responsePromise.futureResult
-        } catch {
-            return request.failure(.badRequest)
+        if let modelHeaderName = HTTPField.Name("model"),
+           let modelName = request.headers[modelHeaderName] {
+            clientRequest.headers.replaceOrAdd(name: "model", value: modelName)
         }
-    }
-}
 
-extension HBRequest {
-    /// create AsyncHTTPClient request from Hummingbird Request
-    func ahcRequest(uri: String, host: String, eventLoop: EventLoop) throws -> HTTPClient.Request {
-        
-        var headers = self.headers
-        headers.remove(name: "host")
-
-        switch self.body {
-        case .byteBuffer(let buffer):
-            return try HTTPClient.Request(
-                url: host + uri,
-                method: self.method,
-                headers: headers,
-                body: buffer.map { .byteBuffer($0) }
-            )
-
-        case .stream(let stream):
-            let contentLength = self.headers["content-length"].first.map { Int($0) } ?? nil
-            return try HTTPClient.Request(
-                url: host + uri,
-                method: self.method,
-                headers: headers,
-                body: .stream(length: contentLength) { writer in
-                    return stream.consumeAll(on: eventLoop) { byteBuffer in
-                        writer.write(.byteBuffer(byteBuffer))
-                    }
+        if let remoteAddress = context.remoteAddress {
+            switch remoteAddress {
+            case .v4:
+                if let ip = remoteAddress.ipAddress {
+                    clientRequest.headers.add(name: "Forwarded", value: "for=\(ip)")
                 }
+            case .v6:
+                if let ip = remoteAddress.ipAddress {
+                    clientRequest.headers.add(name: "Forwarded", value: "for=\"[\(ip)]\"")
+                }
+            default:
+                break
+            }
+        }
+
+        if clientRequest.headers.contains(name: "host") {
+            clientRequest.headers.remove(name: "host")
+        }
+
+        let contentLength = request.headers[.contentLength].flatMap { Int($0) }
+        clientRequest.body = .stream(
+            request.body,
+            length: contentLength.map { HTTPClientRequest.Body.Length.known(Int64($0)) } ?? .unknown
+        )
+
+        do {
+            let response = try await httpClient.execute(clientRequest, timeout: .seconds(60))
+            context.logger.info("\(request.uri) -> \(clientRequest.url)")
+            return Response(
+                status: .init(code: Int(response.status.code), reasonPhrase: response.status.reasonPhrase),
+                headers: .init(response.headers, splitCookie: false),
+                body: .init(asyncSequence: response.body)
             )
+        } catch {
+            context.logger.error("Client error: \(error)")
+            throw error
         }
     }
 }
 
 extension String {
-    private func addSuffix(_ suffix: String) -> String {
-        if hasSuffix(suffix) {
-            return self
-        } else {
-            return self + suffix
-        }
-    }
-
     fileprivate func dropSuffix(_ suffix: String) -> String {
         if hasSuffix(suffix) {
             return String(self.dropLast(suffix.count))

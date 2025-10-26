@@ -7,51 +7,46 @@
 
 import Foundation
 import Hummingbird
-import NIOHTTP1
+import HTTPTypes
 
 /// Note: The Anthropic API is very picky. `max_tokens` is required (an option in OpenAI) and the
 /// roles must alternate between `user` and `assistant`. It won't accept multiple `user` roles in a row
 /// and extra inputs are not permitted (e.g. `user`)
-struct MessageRouterMiddleware: HBAsyncMiddleware {
-    
-    func apply(to request: Hummingbird.HBRequest, next: any Hummingbird.HBResponder) async throws -> Hummingbird.HBResponse {
-        
-        // 1. Fetch body
-        let request = try await request.collateBody().get()
-        guard let buffer = request.body.buffer, let body = buffer.getString(at: buffer.readerIndex, length: buffer.readableBytes), let data = body.data(using: .utf8) else {
-            request.logger.error("Unable to decode body in MessageRouterMiddleware")
-            throw HBHTTPError(.badRequest)
+struct MessageRouterMiddleware: RouterMiddleware {
+    typealias Context = ProxyRequestContext
+
+    func handle(_ request: Request, context: Context, next: (Request, Context) async throws -> Response) async throws -> Response {
+        if request.uri.path.hasPrefix("/appstore") {
+            return try await next(request, context)
         }
-        
-        // 2. Find model in body. Default to OpenAI if body isn't a chat (but e.g. an embedding)
+
+        var request = request
+        let buffer = try await request.collectBody(upTo: context.maxUploadSize)
+        guard let body = buffer.getString(at: buffer.readerIndex, length: buffer.readableBytes),
+              let data = body.data(using: .utf8) else {
+            context.logger.error("Unable to decode body in MessageRouterMiddleware")
+            throw HTTPError(.badRequest)
+        }
+
         var headers = request.headers
-        var uri = request.uri.string
+        var path = request.head.path ?? request.uri.path
+
         if let model = LLMModel.fetchModel(from: data) {
-            request.logger.info("Rerouting \(model.name) to \(model.provider.name)")
-            headers.replaceOrAdd(name: "model", value: model.name)
+            context.logger.info("Rerouting \(model.name) to \(model.provider.name)")
+            if let modelHeader = HTTPField.Name("model") {
+                headers[modelHeader] = model.name
+            }
             if !model.proxy().location.isEmpty {
-                uri = model.proxy().location
+                path = model.proxy().location
             }
         }
-        
-        // 3. Update header
-        let head = HTTPRequestHead(version: request.version, method: request.method, uri: uri, headers: headers)
-        let convertedRequest = HBRequest(head: head, body: request.body, application: request.application, context: request.context)
-        
-        let response = try await next.respond(to: convertedRequest)
-//        print("---")
-//        switch response.body {
-//        case .stream(let streamer):
-//            let output = streamer.read(on: request.eventLoop)
-//            output.whenSuccess { output in
-//                print(output)
-//            }
-//        default:
-//            break
-//        }
-//        print("---")
-        return response
-//        return try await next.respond(to: convertedRequest)
+
+        var head = request.head
+        head.headerFields = headers
+        head.path = path
+
+        let updatedRequest = Request(head: head, body: request.body)
+        return try await next(updatedRequest, context)
     }
 }
 

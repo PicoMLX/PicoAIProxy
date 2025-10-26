@@ -1,11 +1,14 @@
 import AsyncHTTPClient
-import Hummingbird
-import Foundation
-import JWTKit
-import HummingbirdAuth
 import FluentKit
 import FluentSQLiteDriver
+import Hummingbird
+import HummingbirdAuth
 import HummingbirdFluent
+<<<<<<< Updated upstream:Sources/App/Application+build.swift
+=======
+import JWTKit
+import Logging
+>>>>>>> Stashed changes:Sources/App/Application+configure.swift
 import NIOCore
 import NIOPosix
 import ServiceLifecycle
@@ -13,6 +16,7 @@ import ServiceLifecycle
 public protocol AppArguments {
     var hostname: String { get }
     var port: Int { get }
+<<<<<<< Updated upstream:Sources/App/Application+build.swift
     var location: String { get }
     var target: String { get }
 }
@@ -66,10 +70,13 @@ struct HTTPClientService: Service {
 }
 /*
 public protocol AppArguments {
+=======
+>>>>>>> Stashed changes:Sources/App/Application+configure.swift
     var location: String { get }
     var target: String { get }
 }
 
+<<<<<<< Updated upstream:Sources/App/Application+build.swift
 extension HBApplication {
     /// configure your application
     /// add middleware
@@ -88,62 +95,100 @@ extension HBApplication {
         self.middleware.add(HBLogRequestsMiddleware(.info))
         self.middleware.add(HBLogRequestsMiddleware(.debug))
         self.middleware.add(HBLogRequestsMiddleware(.error))
+=======
+struct ProxyRequestContext: AuthRequestContext {
+    typealias Identity = User
+    var coreContext: CoreRequestContextStorage
+    var identity: User?
+    let remoteAddress: SocketAddress?
+>>>>>>> Stashed changes:Sources/App/Application+configure.swift
 
-        // 3. Set up database
-        self.addFluent()
-//        if let inMemory = HBEnvironment().get("inMemoryDatabase"), inMemory == "1" {
-            self.fluent.databases.use(.sqlite(.memory), as: .sqlite)
-//        } else {
-//            self.fluent.databases.use(.sqlite(.file("db.sqlite")), as: .sqlite)
-//        }
-        
-        // 4. Add migrations
-        self.fluent.migrations.add(UserMigration())
-        self.fluent.migrations.add(UserRequestMigration())
-        try await self.fluent.migrate()
-        
-        // 5. Fetch JWT private key from environment and set up JWT Signers
-        guard let jwtKey = HBEnvironment().get("JWTPrivateKey"),
-              !jwtKey.isEmpty else {
-            self.logger.error("JWTPrivateKey environment variable must be set")
-            throw HBHTTPError(.internalServerError) 
-        }
-        let jwtAuthenticator = JWTAuthenticator()
-        let jwtLocalSignerKid = JWKIdentifier("_aiproxy_local_")
-        jwtAuthenticator.useSigner(.hs256(key: jwtKey), kid: jwtLocalSignerKid)
-
-        // 6. Add AppStoreController routes to verify client's purchase and send JWT token to client
-        let appStoreController = AppStoreController(jwtSigners: jwtAuthenticator.jwtSigners, kid: jwtLocalSignerKid)
-        appStoreController.addRoutes(to: self.router.group("appstore"))
-        
-        // 7. Add JWT authenticator. Will return unauthorized error if no or invalid JWT token was received
-        self.middleware.add(jwtAuthenticator)
-        
-        // 8. Add rate limiter
-        self.middleware.add(RateLimiterMiddleware())
-        
-        // 9. Route message to right provider
-        self.middleware.add(MessageRouterMiddleware())
-        
-        // 10. Add OpenAI API key middleware. This middleware will add the OpenAI org and API key in the header of the request
-        self.middleware.add(APIKeyMiddleware())
-        
-        // 11. Add Proxy middleware. If you don't need any authentication, you can remove steps 3 through 6 above
-        self.middleware.add(
-            HBProxyServerMiddleware(
-                httpClient: httpClient //,
-//                proxy: .init(location: args.location, target: args.target) // Note: This is ignored
-            )
-        )
+    init(source: Source) {
+        self.coreContext = .init(source: source)
+        self.identity = nil
+        self.remoteAddress = source.channel.remoteAddress
     }
 }
 
-extension HBApplication {
-    var httpClient: HTTPClient {
-        get { self.extensions.get(\.httpClient) }
-        set { self.extensions.set(\.httpClient, value: newValue) { httpClient in
-            try httpClient.syncShutdown()
-        }}
+func buildApplication(_ args: some AppArguments) async throws -> some ApplicationProtocol {
+    let environment = Environment()
+    let eventLoopGroup = MultiThreadedEventLoopGroup.singleton
+    let httpClient = HTTPClient(eventLoopGroupProvider: .shared(eventLoopGroup))
+
+    let baseLogger = Logger(label: "PicoAIProxy")
+    var logger = baseLogger
+    if let logLevelRaw = environment.get("logLevel"), let logLevel = Logger.Level(rawValue: logLevelRaw) {
+        logger.logLevel = logLevel
+    }
+
+    let fluentLogger = Logger(label: "PicoAIProxy.Fluent")
+    let fluent = Fluent(eventLoopGroupProvider: .shared(eventLoopGroup), logger: fluentLogger)
+    fluent.databases.use(.sqlite(.memory), as: .sqlite)
+    await fluent.migrations.add(UserMigration())
+    await fluent.migrations.add(UserRequestMigration())
+
+    guard let jwtKey = environment.get("JWTPrivateKey"), !jwtKey.isEmpty else {
+        logger.error("JWTPrivateKey environment variable must be set")
+        throw HTTPError(.internalServerError)
+    }
+
+    let jwtLocalSignerKid = JWKIdentifier("_aiproxy_local_")
+    let jwtAuthenticator = JWTAuthenticator(
+        fluent: fluent,
+        allowPassthrough: environment.get("allowKeyPassthrough") == "1"
+    )
+    jwtAuthenticator.useSigner(JWTSigner.hs256(key: jwtKey), kid: jwtLocalSignerKid)
+
+    let router = Router(context: ProxyRequestContext.self)
+    router.add(middleware: LogRequestsMiddleware(.info))
+    router.add(middleware: LogRequestsMiddleware(.debug))
+    router.add(middleware: LogRequestsMiddleware(.error))
+
+    router.add(middleware: jwtAuthenticator)
+    router.add(middleware: RateLimiterMiddleware(fluent: fluent))
+    router.add(middleware: MessageRouterMiddleware())
+    router.add(middleware: APIKeyMiddleware())
+    let defaultProxy = ProxyServerMiddleware.Proxy(
+        location: args.location,
+        target: args.target.isEmpty ? "https://api.openai.com" : args.target
+    )
+    router.add(middleware: ProxyServerMiddleware(httpClient: httpClient, defaultProxy: defaultProxy))
+
+    let appStoreAuthenticator = try? AppStoreAuthenticator(fluent: fluent)
+    let appStoreController = AppStoreController(
+        fluent: fluent,
+        jwtSigners: jwtAuthenticator.jwtSigners,
+        kid: jwtLocalSignerKid
+    )
+    appStoreController.addRoutes(to: router.group("appstore"), authenticator: appStoreAuthenticator)
+
+    let effectivePort = Int(environment.get("PORT") ?? "\(args.port)") ?? args.port
+
+    var app = Application(
+        router: router,
+        configuration: .init(
+            address: .hostname(args.hostname, port: effectivePort),
+            serverName: "PicoAIProxy"
+        ),
+        services: [fluent],
+        eventLoopGroupProvider: .shared(eventLoopGroup),
+        logger: logger
+    )
+
+    app.addServices(HTTPClientService(client: httpClient))
+    app.beforeServerStarts {
+        try await fluent.migrate()
+    }
+
+    return app
+}
+
+struct HTTPClientService: Service {
+    let client: HTTPClient
+
+    func run() async throws {
+        try? await gracefulShutdown()
+        try await client.shutdown()
     }
 }
 */

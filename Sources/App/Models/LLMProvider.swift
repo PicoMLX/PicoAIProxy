@@ -7,6 +7,7 @@
 
 import Foundation
 import Hummingbird
+import HTTPTypes
 
 struct LLMProvider: Codable {
     
@@ -43,23 +44,31 @@ extension LLMProvider {
     
     /// Updates headers with API key, org and/or other required headers for this provider
     /// - Parameter headers: headers
-    func setHeaders(headers: inout HTTPHeaders) throws {
-        
-        // 1. Set API key
-        guard let apiKey = HBEnvironment().get(apiEnvKey) else {
-            throw HBHTTPError(.internalServerError, message: "Environment API Key \(apiEnvKey) not set")
+    func setHeaders(fields: inout HTTPFields) throws {
+        let environment = Environment()
+
+        guard let apiKey = environment.get(apiEnvKey) else {
+            throw HTTPError(.internalServerError, message: "Environment API Key \(apiEnvKey) not set")
         }
-        headers.replaceOrAdd(name: apiHeaderKey, value: (bearer ? "Bearer " + apiKey : apiKey))
-        
-        if let orgEnvKey, let org = HBEnvironment().get(orgEnvKey) {
-            headers.replaceOrAdd(name: orgEnvKey, value: org)
+
+        try set(value: bearer ? "Bearer \(apiKey)" : apiKey, for: apiHeaderKey, in: &fields)
+
+        if let orgEnvKey, let org = environment.get(orgEnvKey) {
+            try set(value: org, for: orgHeaderKey ?? orgEnvKey, in: &fields)
         }
-        
+
         if let additionalHeaders {
-            for header in additionalHeaders {
-                headers.replaceOrAdd(name: header.key, value: header.value)
+            for (key, value) in additionalHeaders {
+                try set(value: value, for: key, in: &fields)
             }
         }
+    }
+
+    private func set(value: String, for name: String, in fields: inout HTTPFields) throws {
+        guard let fieldName = HTTPField.Name(name) else {
+            throw HTTPError(.internalServerError, message: "Invalid HTTP header name \(name)")
+        }
+        fields[fieldName] = value
     }
 }
 

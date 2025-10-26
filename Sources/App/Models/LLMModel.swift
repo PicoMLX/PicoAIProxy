@@ -20,8 +20,8 @@ struct LLMModel: Codable {
 
 extension LLMModel {
     
-    func proxy() -> HBProxyServerMiddleware.Proxy {
-        HBProxyServerMiddleware.Proxy(location: endpoint, target: provider.host)
+    func proxy() -> ProxyServerMiddleware.Proxy {
+        ProxyServerMiddleware.Proxy(location: endpoint, target: provider.host)
     }
     
     static func fetch(model: String) -> LLMModel? {

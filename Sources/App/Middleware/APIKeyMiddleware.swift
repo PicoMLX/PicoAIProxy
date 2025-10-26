@@ -6,31 +6,35 @@
 //
 
 import Hummingbird
-import NIOHTTP1
+import HTTPTypes
 
-struct APIKeyMiddleware: HBMiddleware {
-    func apply(to request: Hummingbird.HBRequest, next: Hummingbird.HBResponder) -> NIOCore.EventLoopFuture<Hummingbird.HBResponse> {
-        
+struct APIKeyMiddleware: RouterMiddleware {
+    typealias Context = ProxyRequestContext
+
+    func handle(_ request: Request, context: Context, next: (Request, Context) async throws -> Response) async throws -> Response {
+        if request.uri.path.hasPrefix("/appstore") {
+            return try await next(request, context)
+        }
+
         var headers = request.headers
-        
-        // Make sure not to send user's Pico Proxy auth token to provider
-        headers.remove(name: "Authorization")
-        
+        headers[.authorization] = nil
+
         do {
-            if let modelName = headers.first(name: "model"), let model = LLMModel.fetch(model: modelName) {
-                try model.provider.setHeaders(headers: &headers)
+            if let modelHeader = HTTPField.Name("model"),
+               let modelName = headers[modelHeader],
+               let model = LLMModel.fetch(model: modelName) {
+                try model.provider.setHeaders(fields: &headers)
             } else {
-                // Default to OpenAI
-                try LLMProvider.openAI.setHeaders(headers: &headers)
+                try LLMProvider.openAI.setHeaders(fields: &headers)
             }
         } catch {
-            request.logger.error("Error OpenAIKeyMiddleware: \(error.localizedDescription)")
-            return request.failure(error)
+            context.logger.error("Error APIKeyMiddleware: \(error.localizedDescription)")
+            throw HTTPError(.internalServerError, message: "Unable to prepare upstream request headers")
         }
-        
-        let head = HTTPRequestHead(version: request.version, method: request.method, uri: request.uri.string, headers: headers)
-        let request = HBRequest(head: head, body: request.body, application: request.application, context: request.context)
-        
-        return next.respond(to: request)
+
+        var head = request.head
+        head.headerFields = headers
+        let updatedRequest = Request(head: head, body: request.body)
+        return try await next(updatedRequest, context)
     }
 }

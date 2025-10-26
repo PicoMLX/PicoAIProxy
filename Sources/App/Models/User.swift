@@ -8,10 +8,13 @@
 import FluentKit
 import Foundation
 import Hummingbird
-import HummingbirdAuth
 import AppStoreServerLibrary
 
+<<<<<<< Updated upstream
 final class User: Model, Authenticatable {
+=======
+final class User: Model {
+>>>>>>> Stashed changes
     
     static let schema = "user"
     
@@ -59,6 +62,8 @@ final class User: Model, Authenticatable {
         self.jwtToken = token
     }
 }
+
+extension User: @unchecked Sendable {}
 
 
 extension User {

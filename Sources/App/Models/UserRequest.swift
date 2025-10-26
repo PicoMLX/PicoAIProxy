@@ -57,3 +57,5 @@ final class UserRequest: Model {
         self.$user.id = userId
     }
 }
+
+extension UserRequest: @unchecked Sendable {}

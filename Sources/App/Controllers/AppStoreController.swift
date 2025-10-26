@@ -5,12 +5,17 @@
 //  Created by Ronald Mannak on 1/6/24.
 //
 
+import FluentKit
 import Foundation
 import Hummingbird
+<<<<<<< Updated upstream
 import HummingbirdAuth
+=======
+import HummingbirdFluent
+>>>>>>> Stashed changes
 import JWTKit
-import FluentKit
 
+<<<<<<< Updated upstream
 struct AppStoreController<Context: AuthRequestContext> {
     
     let jwtSigners: JWTSigners
@@ -29,50 +34,64 @@ struct AppStoreController<Context: AuthRequestContext> {
         } catch {
             group
                 .post("/", use: incorrectSetup)
+=======
+struct AppStoreController {
+    let fluent: Fluent
+    let jwtSigners: JWTSigners
+    let kid: JWKIdentifier
+
+    func addRoutes(
+        to group: RouterGroup<ProxyRequestContext>,
+        authenticator: AppStoreAuthenticator?
+    ) {
+        guard let authenticator else {
+            group.post("/", use: incorrectSetup)
+>>>>>>> Stashed changes
             return
         }
-        
+
         group
-            .add(middleware: appStoreAuthenticator)
+            .add(middleware: authenticator)
             .post("/", use: login)
     }
+<<<<<<< Updated upstream
     
     @Sendable private func incorrectSetup(_ request: Request, context: Context) async throws -> EditedResponse<UserResponse> {
         request.logger.error("Missing environment variable(s): IAPPrivateKey, IAPIssuerId, IAPKeyId, appBundleId and/or appAppleId")
         throw HBHTTPError(.internalServerError, message: "IAPPrivateKey, IAPIssuerId, IAPKeyId and/or appBundleId environment variables not set")
+=======
+
+    @Sendable
+    private func incorrectSetup(_ request: Request, context: ProxyRequestContext) async throws -> String {
+        context.logger.error("Missing environment variable(s): IAPPrivateKey, IAPIssuerId, IAPKeyId, appBundleId and/or appAppleId")
+        throw HTTPError(.internalServerError, message: "IAPPrivateKey, IAPIssuerId, IAPKeyId and/or appBundleId environment variables not set")
+>>>>>>> Stashed changes
     }
 
-    /// Note: appAccountToken can be nil. All users with an empty appAccountToken
-    /// will be treated as a single user
-    private func login(_ request: HBRequest) async throws -> [String: String] {
-        
-        // 1. Fetch user from AppStoreAuthenticator middleware
-        let user = try request.authRequire(User.self)
-        
-        request.logger.info("Starting login for user \(user.appAccountToken?.uuidString ?? "anon")")
-        
-        // 2. If user is a new user, add user to database
-        if try await User.query(on: request.db)
+    @Sendable
+    private func login(_ request: Request, context: ProxyRequestContext) async throws -> [String: String] {
+        let user = try context.requireIdentity()
+        context.logger.info("Starting login for user \(user.appAccountToken?.uuidString ?? "anon")")
+
+        let db = fluent.db()
+        if try await User.query(on: db)
             .filter(\.$appAccountToken == user.appAccountToken)
-            .first()
-             == nil {
-            try await user.save(on: request.db)
-            request.logger.info("Saved user with app account token \(user.appAccountToken?.uuidString ?? "anon")")
+            .first() == nil {
+            try await user.save(on: db)
+            context.logger.info("Saved user with app account token \(user.appAccountToken?.uuidString ?? "anon")")
         }
-        
+
         let payload = JWTPayloadData(
             subject: .init(value: user.appAccountToken?.uuidString ?? "NO_ACCOUNT"),
-            expiration: .init(value: Date(timeIntervalSinceNow: 12 * 60 * 60)) // 12 hours
+            expiration: .init(value: Date(timeIntervalSinceNow: 12 * 60 * 60))
         )
-        
-        let token = try self.jwtSigners.sign(payload, kid: self.kid)
-        
+
+        let token = try jwtSigners.sign(payload, kid: kid)
+
         user.jwtToken = token
-        try await user.save(on: request.db)
-        
-        return [
-            "token": token,
-        ]
+        try await user.save(on: db)
+
+        return ["token": token]
     }
 }
 

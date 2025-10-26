@@ -1,19 +1,17 @@
 //
-//  File.swift
-//  
+//  JWTAuthenticator.swift
 //
 //  Created by Ronald Mannak on 1/8/24.
 //
 
-//import FluentKit
+import FluentKit
 import Foundation
 import Hummingbird
-import HummingbirdAuth
-import JWTKit
-import NIOFoundationCompat
-import FluentKit
+import HummingbirdFluent
+import HTTPTypes
+@preconcurrency import JWTKit
 
-struct JWTPayloadData: JWTPayload, Equatable, HBAuthenticatable {
+struct JWTPayloadData: JWTPayload, Equatable {
     enum CodingKeys: String, CodingKey {
         case subject = "sub"
         case expiration = "exp"
@@ -21,81 +19,78 @@ struct JWTPayloadData: JWTPayload, Equatable, HBAuthenticatable {
 
     var subject: SubjectClaim
     var expiration: ExpirationClaim
-    // Define additional JWT Attributes here
 
     func verify(using signer: JWTSigner) throws {
         try self.expiration.verifyNotExpired()
     }
 }
 
-struct JWTAuthenticator: HBAsyncAuthenticator {
-    
+struct JWTAuthenticator: RouterMiddleware {
+    typealias Context = ProxyRequestContext
+
+    let fluent: Fluent
+    let allowPassthrough: Bool
     let jwtSigners: JWTSigners
 
-    init() {
+    init(fluent: Fluent, allowPassthrough: Bool) {
+        self.fluent = fluent
+        self.allowPassthrough = allowPassthrough
         self.jwtSigners = JWTSigners()
-    }
-
-    init(_ signer: JWTSigner, kid: JWKIdentifier) {
-        self.jwtSigners = JWTSigners()
-        self.jwtSigners.use(signer, kid: kid)
-    }
-
-    init(jwksData: ByteBuffer) throws {
-        let jwks = try JSONDecoder().decode(JWKS.self, from: jwksData)
-        self.jwtSigners = JWTSigners()
-        try self.jwtSigners.use(jwks: jwks)
     }
 
     func useSigner(_ signer: JWTSigner, kid: JWKIdentifier) {
         self.jwtSigners.use(signer, kid: kid)
     }
 
-    func authenticate(request: HBRequest) async throws -> User? {
-        
-        // 1. Get JWT token from bearer authorization header
-        //    If no token is present, return unauthorized error
-        guard let jwtToken = request.authBearer?.token else {
-            request.logger.error("No jwtToken found")
-            throw HBHTTPError(.unauthorized)
-        }
-        
-        // 2. If passthrough is enabled, and OpenAI key and org is found in headers
-        //    then forward request
-        if let passthrough = HBEnvironment().get("allowKeyPassthrough"),
-           passthrough == "1",
-           let org = request.headers["OpenAI-Organization"].first,
-           org.hasPrefix("org-") == true,
-           jwtToken.hasPrefix("sk-") == true {
-            request.logger.info("OpenAI API key Passthrough")
-            return nil
+    func handle(_ request: Request, context: Context, next: (Request, Context) async throws -> Response) async throws -> Response {
+        if request.uri.path.hasPrefix("/appstore") {
+            return try await next(request, context)
         }
 
-        // 3. Verify token is a valid token created by Pico AI Proxy
-        let payload: String
-        let appAccountToken: UUID?
-        do {
-            payload = try self.jwtSigners.verify(jwtToken, as: JWTPayloadData.self).subject.value
-            appAccountToken = UUID(uuidString: payload)
-        } catch {
-            request.logger.error("Invalid jwtToken received: \(jwtToken)")
-            throw HBHTTPError(.unauthorized)
+        guard let token = bearerToken(from: request) else {
+            context.logger.error("No jwtToken found")
+            throw HTTPError(.unauthorized)
         }
-                    
-        // 4. See if user is in database
-        guard let user = try await User.query(on: request.db)
+
+        if allowPassthrough,
+           let organizationHeader = HTTPField.Name("OpenAI-Organization"),
+           let organization = request.headers[organizationHeader],
+           organization.hasPrefix("org-"),
+           token.hasPrefix("sk-") {
+            context.logger.info("OpenAI API key Passthrough")
+            return try await next(request, context)
+        }
+
+        let payload: JWTPayloadData
+        do {
+            payload = try jwtSigners.verify(token, as: JWTPayloadData.self)
+        } catch {
+            context.logger.error("Invalid jwtToken received")
+            throw HTTPError(.unauthorized)
+        }
+
+        let appAccountToken = UUID(uuidString: payload.subject.value)
+        guard let user = try await User.query(on: fluent.db())
             .filter(\.$appAccountToken == appAccountToken)
             .first() else {
-            
-            // The user has a valid jwtToken but isn't in the database
-            // (This can happen after the server restarted)
-            // Ask user to re-authenticate
-            request.logger.error("User with app account token \(appAccountToken?.uuidString ?? "anon") not found in database")
-            throw HBHTTPError(.proxyAuthenticationRequired)
+            context.logger.error("User with app account token \(appAccountToken?.uuidString ?? "anon") not found in database")
+            throw HTTPError(.proxyAuthenticationRequired)
         }
-                
-        // 5. Return user
-        request.logger.info("Verified user with app account token \(user.appAccountToken?.uuidString ?? "anon")")
-        return user
+
+        var context = context
+        context.identity = user
+        context.logger.info("Verified user with app account token \(user.appAccountToken?.uuidString ?? "anon")")
+        return try await next(request, context)
+    }
+
+    private func bearerToken(from request: Request) -> String? {
+        guard let header = request.headers[.authorization] else { return nil }
+        let parts = header.split(separator: " ", maxSplits: 1)
+        guard parts.count == 2 else { return nil }
+        let scheme = parts[0]
+        if scheme.caseInsensitiveCompare("Bearer") == .orderedSame {
+            return String(parts[1])
+        }
+        return nil
     }
 }
