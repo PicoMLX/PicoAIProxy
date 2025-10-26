@@ -14,7 +14,7 @@ Pico AI Proxy was previously called SwiftOpenAIProxy.
 - Supports multiple LLM providers such as OpenAI and Anthropic (more to come, stay tuned). PicoProxy automatically converts OpenAI Chat API calls to the different providers
 - One click install on [Railway](https://railway.app) and can be installed manually on many other hosting providers. [See How to Deploy](#How-to-deploy)
 
-PicoProxy is written in server-side Swift and uses [HummingBird](https://github.com/hummingbird-project/hummingbird) for its HTTP-server.
+PicoProxy is written in server-side Swift and uses [Hummingbird 2](https://github.com/hummingbird-project/hummingbird) with full async/await support for its HTTP server.
   
 ### Background
 
@@ -125,7 +125,7 @@ The target is the site where all traffic is forwarded to. You can change the tar
 | OpenAI-APIKey | OpenAI API key (sk-...) | https://platform.openai.com |
 | OpenAI-Organization | OpenAI org identifier (org-...) | https://platform.openai.com |
 | Anthropic-APIKey | Anthropic API key (sk-ant-api3-...) | https://docs.anthropic.com/claude/docs/ |
-| ~~allowKeyPassthrough~~ | if 1, requests with a valid OpenAI key and org in the header will be forwarded to OpenAI without modifications (depricated) |
+| allowKeyPassthrough | if 1, requests with a valid OpenAI key and org in the header will be forwarded to OpenAI without validation |
 
 ### App Store Connect environment variables
 | Variable | Description | reference |
@@ -166,6 +166,8 @@ A correctly formatted `IAPPrivateKey` for Pico AI Proxy should appear as a singl
 #### Guidelines and behavior
 
 By default, the rate limiter is off. To activate, set `enableRateLimiter` to 1.
+
+When passthrough is enabled (`allowKeyPassthrough=1`) unauthenticated requests can still be proxied without rate-limited identity records.
 
 The rate limiter counts requests and doesn't distinguish between different models or LLM providers. It's primarily a safeguard against abusive traffic.
 
@@ -263,6 +265,11 @@ Use link below to deploy Pico AI Proxy on Railway. The link includes a referral 
 [![Deploy on Railway](https://railway.app/button.svg)](https://railway.app/template/ocPcV2?referralCode=WKPLp3)
 
 Alternatively, Pico AI Proxy can be installed manually on any other hosting provider.
+
+## Development
+
+- Build: `swift build`
+- Run tests: `swift test`
 
 
 ## Support
