@@ -1,4 +1,8 @@
+#if canImport(FoundationEssentials)
+import FoundationEssentials
+#else
 import Foundation
+#endif
 
 enum JSONValue: Codable, Sendable {
     case string(String)
@@ -45,47 +49,4 @@ enum JSONValue: Codable, Sendable {
         }
     }
 
-    func toObject() -> Any {
-        switch self {
-        case .string(let value):
-            return value
-        case .number(let value):
-            return value
-        case .bool(let value):
-            return value
-        case .object(let dict):
-            return dict.mapValues { $0.toObject() }
-        case .array(let array):
-            return array.map { $0.toObject() }
-        case .null:
-            return NSNull()
-        }
-    }
-
-    static func fromObject(_ object: Any) throws -> JSONValue {
-        switch object {
-        case let value as String:
-            return .string(value)
-        case let value as Bool:
-            return .bool(value)
-        case let value as Int:
-            return .number(Double(value))
-        case let value as Double:
-            return .number(value)
-        case let value as Float:
-            return .number(Double(value))
-        case let value as [String: Any]:
-            var dict: [String: JSONValue] = [:]
-            for (key, nested) in value {
-                dict[key] = try JSONValue.fromObject(nested)
-            }
-            return .object(dict)
-        case let value as [Any]:
-            return .array(try value.map { try JSONValue.fromObject($0) })
-        case _ as NSNull:
-            return .null
-        default:
-            throw NSError(domain: "JSONValue", code: 0, userInfo: [NSLocalizedDescriptionKey: "Unsupported object type \(type(of: object))"])
-        }
-    }
 }

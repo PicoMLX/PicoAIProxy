@@ -1,5 +1,9 @@
 import AsyncHTTPClient
+#if canImport(FoundationEssentials)
+import FoundationEssentials
+#else
 import Foundation
+#endif
 import Hummingbird
 import HTTPTypes
 
@@ -40,7 +44,8 @@ struct SearchProvider: Sendable {
         }
 
         let bodyValue = try buildBody(proxyRequest)
-        let bodyData = try JSONSerialization.data(withJSONObject: bodyValue.toObject(), options: [])
+        let encoder = JSONEncoder()
+        let bodyData = try encoder.encode(bodyValue)
 
         var request = HTTPClientRequest(url: url.absoluteString)
         request.method = .POST
@@ -129,7 +134,7 @@ enum SearchProviders {
             if let cost = response.costDollars?.total {
                 meta["cost"] = .number(cost)
             }
-            let raw = request.raw == true ? try JSONValue.fromObject(JSONSerialization.jsonObject(with: providerResponse.body)) : nil
+            let raw = request.raw == true ? try JSONDecoder().decode(JSONValue.self, from: providerResponse.body) : nil
             return SearchProxyResponse(provider: "exa", results: results, answer: nil, images: nil, raw: raw, meta: meta.isEmpty ? nil : meta)
         }
     )
@@ -195,7 +200,7 @@ enum SearchProviders {
                     return SearchProxyResponse.Image(url: url, description: entry.title)
                 }
             }
-            let raw = request.raw == true ? try JSONValue.fromObject(JSONSerialization.jsonObject(with: providerResponse.body)) : nil
+            let raw = request.raw == true ? try JSONDecoder().decode(JSONValue.self, from: providerResponse.body) : nil
             return SearchProxyResponse(provider: "firecrawl", results: results, answer: nil, images: images, raw: raw, meta: response.warning.map { ["warning": .string($0)] })
         }
     )
@@ -280,7 +285,7 @@ enum SearchProviders {
                 }
                 meta["autoParameters"] = .object(autoObject)
             }
-            let raw = request.raw == true ? try JSONValue.fromObject(JSONSerialization.jsonObject(with: providerResponse.body)) : nil
+            let raw = request.raw == true ? try JSONDecoder().decode(JSONValue.self, from: providerResponse.body) : nil
             return SearchProxyResponse(provider: "tavily", results: results, answer: request.includeAnswer == true ? response.answer : nil, images: images, raw: raw, meta: meta)
         }
     )

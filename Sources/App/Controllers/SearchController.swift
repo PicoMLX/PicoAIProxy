@@ -1,5 +1,9 @@
 import AsyncHTTPClient
+#if canImport(FoundationEssentials)
+import FoundationEssentials
+#else
 import Foundation
+#endif
 import Hummingbird
 import HTTPTypes
 import NIOCore
@@ -17,16 +21,13 @@ struct SearchController {
     private func handleSearch(_ request: Request, context: ProxyRequestContext) async throws -> Response {
         var request = request
         let buffer = try await request.collectBody(upTo: context.maxUploadSize)
-        guard let body = buffer.getString(at: buffer.readerIndex, length: buffer.readableBytes) else {
-            throw HTTPError(.badRequest)
-        }
 
         let decoder = JSONDecoder()
         decoder.keyDecodingStrategy = .convertFromSnakeCase
-        guard let data = body.data(using: String.Encoding.utf8) else {
+        guard let bytes = buffer.getBytes(at: buffer.readerIndex, length: buffer.readableBytes) else {
             throw HTTPError(.badRequest)
         }
-        let payload = try decoder.decode(SearchProxyRequest.self, from: data)
+        let payload = try decoder.decode(SearchProxyRequest.self, from: Data(bytes))
         let providerSlug = context.parameters.get("provider") ?? payload.provider
         guard let providerSlug, let provider = SearchProviders.all[providerSlug.lowercased()] else {
             throw HTTPError(.badRequest, message: "Unknown provider")
