@@ -44,6 +44,9 @@ struct ProxyServerMiddleware: RouterMiddleware {
     }
 
     func handle(_ request: Request, context: Context, next: (Request, Context) async throws -> Response) async throws -> Response {
+        if request.uri.path.hasPrefix("/search") {
+            return try await next(request, context)
+        }
         let selectedProxy = proxy(for: request)
 
         guard let response = try await forward(request: request, to: selectedProxy, context: context) else {

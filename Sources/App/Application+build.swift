@@ -82,6 +82,9 @@ func buildApplication(_ args: some AppArguments) async throws -> some Applicatio
     )
     appStoreController.addRoutes(to: router.group("appstore"), authenticator: appStoreAuthenticator)
 
+    let searchController = SearchController(httpClient: httpClient)
+    searchController.registerRoutes(on: router)
+
     let effectivePort = Int(environment.get("PORT") ?? "\(args.port)") ?? args.port
 
     var app = Application(
